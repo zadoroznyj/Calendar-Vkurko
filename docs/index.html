@@ -44,13 +44,13 @@
 
 <script type="text/javascript">
     const ec = EventCalendar.create(document.getElementById('ec'), {
-        view: 'resourceTimeGridDay',  // <-- поменял на ресурсный дневной вид
+        view: 'resourceTimeGridDay',
         headerToolbar: {
             start: 'prev,next today',
             center: 'title',
             end: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek resourceTimeGridWeek,resourceTimelineWeek'
         },
-        resources: [    // вот два мастера как ресурсы
+        resources: [
             {id: 1, title: 'Наталья'},
             {id: 2, title: 'Ирина'}
         ],
@@ -121,30 +121,24 @@
         return (norm < 10 ? '0' : '') + norm;
     }
 
-    // --- Добавлено для двойного тапа по дате в month view ---
-    let lastTapTime = 0;
+    // Двойной тап в dayGridMonth
+    let lastTap = 0;
+
     document.getElementById('ec').addEventListener('click', function (e) {
         if (ec.getOption('view') !== 'dayGridMonth') return;
 
-        const target = e.target.closest('.ec-day-number');
-        if (!target) return;
+        const cell = e.target.closest('.ec-cell');
+        if (!cell || !cell.dataset.date) return;
 
-        const now = Date.now();
-        if (now - lastTapTime < 400) {
-            const dayNum = parseInt(target.textContent.trim(), 10);
-            if (isNaN(dayNum)) return;
+        const now = new Date().getTime();
+        const delta = now - lastTap;
 
-            const title = document.querySelector('.ec-title');
-            if (!title) return;
-
-            const [monthName, year] = title.textContent.split(' ');
-            const monthIndex = new Date(Date.parse(monthName + " 1, 2020")).getMonth();
-
-            const date = new Date(parseInt(year), monthIndex, dayNum);
+        if (delta > 0 && delta < 500) {
             ec.setOption('view', 'resourceTimeGridDay');
-            ec.setDate(date);
+            ec.setDate(cell.dataset.date);
         }
-        lastTapTime = now;
+
+        lastTap = now;
     });
 </script>
 </body>
