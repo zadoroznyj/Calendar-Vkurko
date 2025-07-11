@@ -2,109 +2,136 @@
 <html lang="ru">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>EventCalendar с двумя колонками и зумом месяца</title>
+  <title>Календарь с двумя колонками и ночным режимом</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  
+  <link href="https://cdn.jsdelivr.net/npm/fullcalendar@4.4.2/core/main.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/fullcalendar@4.4.2/daygrid/main.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/@fullcalendar/resource-timegrid@4.4.2/main.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/fullcalendar@4.4.2/timegrid/main.min.css" rel="stylesheet" />
 
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@event-calendar/build@4.5.0/dist/event-calendar.min.css" />
-  <script src="https://cdn.jsdelivr.net/npm/@event-calendar/build@4.5.0/dist/event-calendar.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@4.4.2/core/main.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@4.4.2/interaction/main.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@4.4.2/daygrid/main.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@4.4.2/timegrid/main.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@fullcalendar/resource-common@4.4.2/main.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@fullcalendar/resource-timegrid@4.4.2/main.min.js"></script>
 
   <style>
     body {
-      margin: 0;
-      font-family: Arial, sans-serif;
+      margin: 0; padding: 0;
+      font-family: "Lucida Grande", Helvetica, Arial, Verdana, sans-serif;
+      font-size: 14px;
+      background: #fff;
+      transition: background-color 0.3s, color 0.3s;
     }
-    #ec {
+    #calendar {
       max-width: 900px;
-      margin: 20px auto;
-      /* начальный масштаб для месяца */
-      --month-zoom: 1;
+      margin: 40px auto;
     }
-
-    /* Поддержка зума месяца: меняем масштаб шрифта и высоту ячеек */
-    .ec-day-grid-view[style*="display: block"] {
-      transform-origin: top left;
-      transform: scale(var(--month-zoom));
+    .fc-toolbar-chunk {
+      display: flex;
+      align-items: center;
+      gap: 10px;
     }
-
-    /* Немного отделим колонки для ресурсов */
-    .ec-time-grid .ec-resource-column {
-      border-right: 1px solid #ccc;
+    /* Ночной режим */
+    body.night-mode {
+      background: #121212;
+      color: #eee;
+    }
+    body.night-mode .fc {
+      background: #121212;
+      color: #eee;
+    }
+    body.night-mode .fc-toolbar-title,
+    body.night-mode .fc-button {
+      color: #eee;
+      background: #222;
+      border-color: #444;
+    }
+    body.night-mode .fc-button:hover {
+      background: #555;
+    }
+    #toggleNightMode {
+      cursor: pointer;
+      padding: 4px 10px;
+      background: #007bff;
+      border: none;
+      border-radius: 5px;
+      color: white;
+      font-weight: 600;
     }
   </style>
 </head>
 <body>
 
-  <div id="ec"></div>
+  <button id="toggleNightMode" title="Переключить ночной режим">🌙 Ночной режим</button>
+  <div id="calendar"></div>
 
   <script>
-    const ec = EventCalendar.create(document.getElementById('ec'), {
-      view: 'timeGridWeek',
-      headerToolbar: {
-        start: 'prev,next today',
-        center: 'title',
-        end: 'dayGridMonth,timeGridWeek,timeGridDay'
-      },
-      resources: [
-        { id: 'natalia', title: 'Наталья' },
-        { id: 'irina', title: 'Ирина' }
-      ],
-      scrollTime: '09:00:00',
-      events: createEvents(),
-      views: {
-        timeGridDay: { pointer: true },
-        timeGridWeek: { pointer: true },
-        dayGridMonth: {
-          pointer: true,
-          // ресурсные колонки в месяце не поддерживаются EventCalendar
+    document.addEventListener('DOMContentLoaded', function () {
+      let isNight = false;
+
+      const calendarEl = document.getElementById('calendar');
+
+      const calendar = new FullCalendar.Calendar(calendarEl, {
+        plugins: [ 'interaction', 'dayGrid', 'timeGrid', 'resourceTimeGrid' ],
+        schedulerLicenseKey: 'CC-Attribution-NonCommercial-NoDerivatives',
+        defaultView: 'resourceTimeGridDay',
+        header: {
+          left: 'prev,next today',
+          center: 'title',
+          right: 'resourceTimeGridDay,resourceTimeGridWeek,dayGridMonth'
+        },
+        resources: [
+          { id: 'natalia', title: 'Наталья' },
+          { id: 'irina', title: 'Ирина' }
+        ],
+        events: [
+          { id: '1', resourceId: 'natalia', start: '2025-07-10T09:00:00', end: '2025-07-10T11:00:00', title: 'Процедура у Натальи' },
+          { id: '2', resourceId: 'irina', start: '2025-07-10T12:00:00', end: '2025-07-10T13:30:00', title: 'Звонок Ирине' }
+        ],
+        editable: true,
+        selectable: true,
+        nowIndicator: true,
+        // Масштабирование событий в месячном виде
+        eventLimit: true,
+        views: {
+          dayGridMonth: {
+            eventLimit: 3,
+            eventLimitClick: 'popover'
+          }
         }
-      },
-      dayMaxEvents: true,
-      nowIndicator: true,
-      selectable: true
+      });
+
+      calendar.render();
+
+      // Кнопка ночного режима
+      const btnNight = document.getElementById('toggleNightMode');
+      btnNight.addEventListener('click', () => {
+        isNight = !isNight;
+        document.body.classList.toggle('night-mode', isNight);
+        btnNight.textContent = isNight ? '☀️ Светлый режим' : '🌙 Ночной режим';
+      });
+
+      // Масштабирование событий в месячном виде колесом мыши
+      calendarEl.addEventListener('wheel', (e) => {
+        if (calendar.view.type !== 'dayGridMonth') return; // только в месяце
+        if (e.ctrlKey || e.metaKey) {
+          e.preventDefault();
+
+          let curEventLimit = calendar.getOption('eventLimit') || 3;
+          if (e.deltaY < 0) {
+            // zoom in - показываем больше событий
+            curEventLimit = Math.min(10, curEventLimit + 1);
+          } else {
+            // zoom out - показываем меньше событий
+            curEventLimit = Math.max(1, curEventLimit - 1);
+          }
+          calendar.setOption('eventLimit', curEventLimit);
+        }
+      });
     });
-
-    // Функция для генерации событий, сегодня - сдвиг на день недели для выравнивания недели
-    function createEvents() {
-      let days = [];
-      for (let i = 0; i < 7; ++i) {
-        let day = new Date();
-        let diff = i - day.getDay();
-        day.setDate(day.getDate() + diff);
-        days[i] = day.getFullYear() + "-" + _pad(day.getMonth()+1) + "-" + _pad(day.getDate());
-      }
-
-      return [
-        {start: days[0] + " 10:00", end: days[0] + " 12:00", resourceId: 'natalia', title: "Запись у Натальи"},
-        {start: days[0] + " 13:00", end: days[0] + " 15:00", resourceId: 'irina', title: "Запись у Ирины"},
-        {start: days[1] + " 09:00", end: days[1] + " 11:00", resourceId: 'natalia', title: "Процедура у Натальи"},
-        {start: days[1] + " 12:00", end: days[1] + " 14:00", resourceId: 'irina', title: "Звонок Ирине"},
-        // для месяца добавим пару событий
-        {start: days[3], end: days[3], resourceId: 'natalia', title: "Событие в месяце" },
-        {start: days[4], end: days[4], resourceId: 'irina', title: "Другое событие" }
-      ];
-    }
-
-    function _pad(num) {
-      let norm = Math.floor(Math.abs(num));
-      return (norm < 10 ? '0' : '') + norm;
-    }
-
-    ec.render();
-
-    // ---- Реализация зума месяца через Ctrl + колесо мыши ----
-    const ecEl = document.getElementById('ec');
-    ecEl.addEventListener('wheel', e => {
-      // Проверяем что мы в месячном режиме (dayGridMonth вид)
-      if (ec.getView().name === 'dayGridMonth' && (e.ctrlKey || e.metaKey)) {
-        e.preventDefault();
-
-        let currentZoom = parseFloat(getComputedStyle(ecEl).getPropertyValue('--month-zoom')) || 1;
-        let delta = e.deltaY > 0 ? -0.1 : 0.1;
-        let newZoom = Math.min(Math.max(currentZoom + delta, 0.6), 2);
-
-        ecEl.style.setProperty('--month-zoom', newZoom.toFixed(2));
-      }
-    }, { passive: false });
   </script>
 
 </body>
