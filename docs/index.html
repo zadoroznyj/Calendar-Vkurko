@@ -4,16 +4,13 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>EventCalendar</title>
-  <link rel="stylesheet" href="global.css?20231021" />
-  <link
-    rel="stylesheet"
-    href="https://cdn.jsdelivr.net/npm/@event-calendar/build@4.5.0/dist/event-calendar.min.css"
-  />
+
+  <link rel="stylesheet" href="global.css?20231021">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@event-calendar/build@4.5.0/dist/event-calendar.min.css">
   <script src="https://cdn.jsdelivr.net/npm/@event-calendar/build@4.5.0/dist/event-calendar.min.js"></script>
 
   <style>
-    .ec-timeline .ec-time,
-    .ec-timeline .ec-line {
+    .ec-timeline .ec-time, .ec-timeline .ec-line {
       width: 16px;
     }
     .ec-timeline .ec-time {
@@ -26,108 +23,35 @@
     }
   </style>
 </head>
+
 <body>
-  <header class="row"></header>
+  <header class="row">
+    <button class="toggle-dark-button" title="Toggle dark mode" onclick="document.body.classList.toggle('ec-dark')">🌙</button>
+  </header>
   <main class="row">
     <div id="ec" class="col"></div>
   </main>
 
   <script>
-    const ecContainer = document.getElementById("ec");
-
-    // Переменная для хранения времени последнего тапа и координат
-    let lastTap = 0;
-    let lastTapX = 0;
-    let lastTapY = 0;
-
-    const ec = EventCalendar.create(ecContainer, {
-      view: "dayGridMonth", // стартовый вид — месяц
+    const ec = EventCalendar.create(document.getElementById('ec'), {
+      view: 'dayGridMonth',
       headerToolbar: {
-        start: "prev,next today",
-        center: "title",
-        end:
-          "dayGridMonth,timeGridWeek,timeGridDay,listWeek resourceTimeGridWeek,resourceTimelineWeek",
+        start: 'prev,next today',
+        center: 'title',
+        end: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek resourceTimeGridWeek'
       },
       resources: [
-        // ресурсы
-        { id: 1, title: "Наталья" },
-        { id: 2, title: "Ирина" },
+        { id: 1, title: 'Наталья' },
+        { id: 2, title: 'Ирина' }
       ],
-      scrollTime: "09:00:00",
+      scrollTime: '09:00:00',
       events: createEvents(),
       views: {
-        timeGridWeek: { pointer: true },
-        resourceTimeGridWeek: { pointer: true },
-        resourceTimelineWeek: {
-          slotDuration: "00:15",
-          slotLabelInterval: "01:00",
-          slotMinTime: "09:00",
-          slotMaxTime: "21:00",
-          slotWidth: 16,
-          resources: [
-            { id: 1, title: "Resource A" },
-            { id: 2, title: "Resource B" },
-            { id: 3, title: "Resource C" },
-            { id: 4, title: "Resource D" },
-            { id: 5, title: "Resource E" },
-            { id: 6, title: "Resource F" },
-            { id: 7, title: "Resource G" },
-            { id: 8, title: "Resource H" },
-            {
-              id: 9,
-              title: "Resource I",
-              children: [
-                { id: 10, title: "Resource J" },
-                { id: 11, title: "Resource K" },
-                {
-                  id: 12,
-                  title: "Resource L",
-                  children: [
-                    { id: 13, title: "Resource M" },
-                    { id: 14, title: "Resource N" },
-                    { id: 15, title: "Resource O" },
-                  ],
-                },
-              ],
-            },
-          ],
-        },
+        resourceTimeGridWeek: { pointer: true }
       },
       dayMaxEvents: true,
       nowIndicator: true,
-      selectable: true,
-    });
-
-    // Добавляем обработчик на контейнер календаря
-    ecContainer.addEventListener("click", (e) => {
-      const currentTime = new Date().getTime();
-      const tapX = e.clientX;
-      const tapY = e.clientY;
-      const timeDiff = currentTime - lastTap;
-
-      // Если два тапа за 300 мс и близко по координатам — считаем это двойным тапом
-      if (
-        timeDiff < 300 &&
-        Math.abs(tapX - lastTapX) < 30 &&
-        Math.abs(tapY - lastTapY) < 30
-      ) {
-        // Определяем дату дня, по которому тапнули (для month view)
-        // Попытаемся получить элемент с датой
-        const dayCell = e.target.closest(".ec-day-grid-day");
-        if (dayCell) {
-          const dateAttr = dayCell.getAttribute("data-date");
-          if (dateAttr) {
-            // Переключаем вид на resourceTimeGridDay с нужной датой
-            ec.changeView("resourceTimeGridDay", dateAttr);
-          }
-        }
-        // Сбросим lastTap чтобы не поймать тройной тап
-        lastTap = 0;
-      } else {
-        lastTap = currentTime;
-        lastTapX = tapX;
-        lastTapY = tapY;
-      }
+      selectable: true
     });
 
     function createEvents() {
@@ -136,100 +60,45 @@
         let day = new Date();
         let diff = i - day.getDay();
         day.setDate(day.getDate() + diff);
-        days[i] =
-          day.getFullYear() + "-" + _pad(day.getMonth() + 1) + "-" + _pad(day.getDate());
+        days[i] = day.getFullYear() + "-" + _pad(day.getMonth()+1) + "-" + _pad(day.getDate());
       }
-
       return [
-        {
-          start: days[0] + " 00:00",
-          end: days[0] + " 09:00",
-          resourceId: 1,
-          display: "background",
-        },
-        {
-          start: days[1] + " 12:00",
-          end: days[1] + " 14:00",
-          resourceId: 2,
-          display: "background",
-        },
-        {
-          start: days[2] + " 17:00",
-          end: days[2] + " 24:00",
-          resourceId: 1,
-          display: "background",
-        },
-        {
-          start: days[0] + " 10:00",
-          end: days[0] + " 14:00",
-          resourceId: 1,
-          title: "The calendar can display background and regular events",
-          color: "#FE6B64",
-        },
-        {
-          start: days[1] + " 16:00",
-          end: days[2] + " 08:00",
-          resourceId: 2,
-          title: "An event may span to another day",
-          color: "#B29DD9",
-        },
-        {
-          start: days[2] + " 09:00",
-          end: days[2] + " 13:00",
-          resourceId: 2,
-          title: "Events can be assigned to resources and the calendar has the resources view built-in",
-          color: "#779ECB",
-        },
-        {
-          start: days[3] + " 14:00",
-          end: days[3] + " 20:00",
-          resourceId: 1,
-          title: "",
-          color: "#FE6B64",
-        },
-        {
-          start: days[3] + " 15:00",
-          end: days[3] + " 18:00",
-          resourceId: 1,
-          title: "Overlapping events are positioned properly",
-          color: "#779ECB",
-        },
-        {
-          start: days[5] + " 10:00",
-          end: days[5] + " 16:00",
-          resourceId: 2,
-          title: { html: "You have complete control over the <i><b>display</b></i> of events…" },
-          color: "#779ECB",
-        },
-        {
-          start: days[5] + " 14:00",
-          end: days[5] + " 19:00",
-          resourceId: 2,
-          title: "…and you can drag and drop the events!",
-          color: "#FE6B64",
-        },
-        {
-          start: days[5] + " 18:00",
-          end: days[5] + " 21:00",
-          resourceId: 2,
-          title: "",
-          color: "#B29DD9",
-        },
-        {
-          start: days[1],
-          end: days[3],
-          resourceId: 1,
-          title: "All-day events can be displayed at the top",
-          color: "#B29DD9",
-          allDay: true,
-        },
+        {start: days[0] + " 00:00", end: days[0] + " 09:00", resourceId: 1, display: "background"},
+        {start: days[1] + " 12:00", end: days[1] + " 14:00", resourceId: 2, display: "background"},
+        {start: days[2] + " 17:00", end: days[2] + " 24:00", resourceId: 1, display: "background"},
+        {start: days[0] + " 10:00", end: days[0] + " 14:00", resourceId: 1, title: "Event A", color: "#FE6B64"},
+        {start: days[1] + " 16:00", end: days[2] + " 08:00", resourceId: 2, title: "Event B", color: "#B29DD9"},
+        {start: days[2] + " 09:00", end: days[2] + " 13:00", resourceId: 2, title: "Event C", color: "#779ECB"},
+        {start: days[3] + " 14:00", end: days[3] + " 20:00", resourceId: 1, title: "Event D", color: "#FE6B64"},
+        {start: days[3] + " 15:00", end: days[3] + " 18:00", resourceId: 1, title: "Event E", color: "#779ECB"},
+        {start: days[5] + " 10:00", end: days[5] + " 16:00", resourceId: 2, title: "Event F", color: "#779ECB"},
+        {start: days[5] + " 14:00", end: days[5] + " 19:00", resourceId: 2, title: "Event G", color: "#FE6B64"},
+        {start: days[5] + " 18:00", end: days[5] + " 21:00", resourceId: 2, title: "Event H", color: "#B29DD9"},
+        {start: days[1], end: days[3], resourceId: 1, title: "All-day", color: "#B29DD9", allDay: true}
       ];
     }
 
     function _pad(num) {
       let norm = Math.floor(Math.abs(num));
-      return (norm < 10 ? "0" : "") + norm;
+      return (norm < 10 ? '0' : '') + norm;
     }
+
+    // ===== ДВОЙНОЙ ТАП ПО ДНЮ В MONTH VIEW =====
+    let lastTap = 0;
+    document.addEventListener('touchstart', function (e) {
+      const target = e.target.closest('.ec-daygrid-day');
+      if (!target || !ec.view || !ec.view.type.includes('Month')) return;
+
+      const time = new Date().getTime();
+      if (time - lastTap < 300) {
+        const dateStr = target.getAttribute('data-date');
+        if (dateStr) {
+          ec.setOption({ view: 'resourceTimeGridDay' });
+          ec.gotoDate(dateStr);
+        }
+      }
+      lastTap = time;
+    });
   </script>
 </body>
 </html>
