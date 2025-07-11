@@ -44,13 +44,13 @@
 
 <script type="text/javascript">
     const ec = EventCalendar.create(document.getElementById('ec'), {
-        view: 'resourceTimeGridDay',  // <-- поменял на ресурсный дневной вид
+        view: 'resourceTimeGridDay',
         headerToolbar: {
             start: 'prev,next today',
             center: 'title',
             end: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek resourceTimeGridWeek,resourceTimelineWeek'
         },
-        resources: [    // вот два мастера как ресурсы
+        resources: [
             {id: 1, title: 'Наталья'},
             {id: 2, title: 'Ирина'}
         ],
@@ -89,6 +89,24 @@
         dayMaxEvents: true,
         nowIndicator: true,
         selectable: true
+    });
+
+    // Добавлено: обработка двойного клика по дню в режиме "month"
+    let lastClick = 0;
+    let lastDate = null;
+
+    ec.on('dateClick', ({ date }) => {
+        const now = Date.now();
+
+        if (ec.getOption('view') !== 'dayGridMonth') return;
+
+        if (lastDate === date.toDateString() && (now - lastClick < 500)) {
+            ec.setOption('view', 'resourceTimeGridDay');
+            ec.setDate(date);
+        }
+
+        lastClick = now;
+        lastDate = date.toDateString();
     });
 
     function createEvents() {
