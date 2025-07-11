@@ -91,22 +91,14 @@
         selectable: true
     });
 
-    // Добавлено: обработка двойного клика по дню в режиме "month"
-    let lastClick = 0;
-    let lastDate = null;
-
-    ec.on('dateClick', ({ date }) => {
-        const now = Date.now();
-
+    // 👇 Новый код для двойного клика по дню в month-виде
+    document.getElementById('ec').addEventListener('dblclick', function (e) {
         if (ec.getOption('view') !== 'dayGridMonth') return;
-
-        if (lastDate === date.toDateString() && (now - lastClick < 500)) {
-            ec.setOption('view', 'resourceTimeGridDay');
-            ec.setDate(date);
-        }
-
-        lastClick = now;
-        lastDate = date.toDateString();
+        const cell = e.target.closest('.ec-day');
+        if (!cell || !cell.dataset.date) return;
+        const dateStr = cell.dataset.date;
+        ec.setOption('view', 'resourceTimeGridDay');
+        ec.setDate(new Date(dateStr));
     });
 
     function createEvents() {
