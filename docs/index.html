@@ -44,13 +44,13 @@
 
 <script type="text/javascript">
     const ec = EventCalendar.create(document.getElementById('ec'), {
-        view: 'resourceTimeGridDay',
+        view: 'resourceTimeGridDay',  // <-- поменял на ресурсный дневной вид
         headerToolbar: {
             start: 'prev,next today',
             center: 'title',
             end: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek resourceTimeGridWeek,resourceTimelineWeek'
         },
-        resources: [
+        resources: [    // вот два мастера как ресурсы
             {id: 1, title: 'Наталья'},
             {id: 2, title: 'Ирина'}
         ],
@@ -91,25 +91,6 @@
         selectable: true
     });
 
-    // Двойной клик (или тап) по ячейке дня в режиме month
-let lastClickTime = 0;
-document.getElementById('ec').addEventListener('click', function (e) {
-    if (ec.getOption('view') !== 'dayGridMonth') return;
-
-    const now = new Date().getTime();
-    const cell = e.target.closest('.ec-day');
-    if (!cell || !cell.getAttribute('data-date')) return;
-
-    if (now - lastClickTime < 400) {
-        // Двойной клик: переключаемся на resourceTimeGridDay
-        const dateStr = cell.getAttribute('data-date');
-        ec.setOption('view', 'resourceTimeGridDay');
-        ec.setDate(new Date(dateStr));
-    }
-
-    lastClickTime = now;
-});
-
     function createEvents() {
         let days = [];
         for (let i = 0; i < 7; ++i) {
@@ -139,6 +120,32 @@ document.getElementById('ec').addEventListener('click', function (e) {
         let norm = Math.floor(Math.abs(num));
         return (norm < 10 ? '0' : '') + norm;
     }
+
+    // --- Добавлено для двойного тапа по дате в month view ---
+    let lastTapTime = 0;
+    document.getElementById('ec').addEventListener('click', function (e) {
+        if (ec.getOption('view') !== 'dayGridMonth') return;
+
+        const target = e.target.closest('.ec-day-number');
+        if (!target) return;
+
+        const now = Date.now();
+        if (now - lastTapTime < 400) {
+            const dayNum = parseInt(target.textContent.trim(), 10);
+            if (isNaN(dayNum)) return;
+
+            const title = document.querySelector('.ec-title');
+            if (!title) return;
+
+            const [monthName, year] = title.textContent.split(' ');
+            const monthIndex = new Date(Date.parse(monthName + " 1, 2020")).getMonth();
+
+            const date = new Date(parseInt(year), monthIndex, dayNum);
+            ec.setOption('view', 'resourceTimeGridDay');
+            ec.setDate(date);
+        }
+        lastTapTime = now;
+    });
 </script>
 </body>
 </html>
