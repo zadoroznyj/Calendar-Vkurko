@@ -59,7 +59,7 @@
                 slotMinTime: '09:00',
                 slotMaxTime: '21:00',
                 slotWidth: 16,
-                resources: [ /* ...ресурсы опущены для краткости... */ ]
+                resources: []
             }
         },
         dayMaxEvents: true,
@@ -99,6 +99,30 @@
     function _pad(num) {
         let norm = Math.floor(Math.abs(num));
         return (norm < 10 ? '0' : '') + norm;
+    }
+
+    // Добавляем свайп
+    let touchStartX = 0;
+    let touchEndX = 0;
+
+    document.addEventListener('touchstart', function (e) {
+        touchStartX = e.changedTouches[0].screenX;
+    }, false);
+
+    document.addEventListener('touchend', function (e) {
+        touchEndX = e.changedTouches[0].screenX;
+        handleSwipe();
+    }, false);
+
+    function handleSwipe() {
+        const diff = touchEndX - touchStartX;
+        if (Math.abs(diff) > 50) {
+            if (diff > 0) {
+                ec.prev();
+            } else {
+                ec.next();
+            }
+        }
     }
 </script>
 </body>
