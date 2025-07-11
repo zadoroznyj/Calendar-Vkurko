@@ -98,14 +98,28 @@
     dateClick: null // отключено
   });
 
-  document.addEventListener('dblclick', function(e) {
-    const target = e.target.closest('.ec-day:not(.ec-other)');
-    if (target && ec.getView().name === 'dayGridMonth') {
-      const dateStr = target.getAttribute('data-date');
+  // Реализация двойного тапа на мобильных
+  let lastTapTime = 0;
+  let lastTapTarget = null;
+
+  document.addEventListener("touchend", function(e) {
+    const now = Date.now();
+    const tapped = e.target.closest('.ec-day:not(.ec-other)');
+    if (!tapped) return;
+
+    if (ec.getView().name !== 'dayGridMonth') return;
+
+    if (lastTapTarget === tapped && now - lastTapTime < 400) {
+      const dateStr = tapped.getAttribute('data-date');
       if (dateStr) {
         ec.setOption('date', dateStr);
         ec.setOption('view', 'resourceTimeGridDay');
       }
+      lastTapTime = 0;
+      lastTapTarget = null;
+    } else {
+      lastTapTime = now;
+      lastTapTarget = tapped;
     }
   });
 
