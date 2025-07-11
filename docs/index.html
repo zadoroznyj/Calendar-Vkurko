@@ -91,15 +91,24 @@
         selectable: true
     });
 
-    // 👇 Новый код для двойного клика по дню в month-виде
-    document.getElementById('ec').addEventListener('dblclick', function (e) {
-        if (ec.getOption('view') !== 'dayGridMonth') return;
-        const cell = e.target.closest('.ec-day');
-        if (!cell || !cell.dataset.date) return;
-        const dateStr = cell.dataset.date;
+    // Двойной клик (или тап) по ячейке дня в режиме month
+let lastClickTime = 0;
+document.getElementById('ec').addEventListener('click', function (e) {
+    if (ec.getOption('view') !== 'dayGridMonth') return;
+
+    const now = new Date().getTime();
+    const cell = e.target.closest('.ec-day');
+    if (!cell || !cell.getAttribute('data-date')) return;
+
+    if (now - lastClickTime < 400) {
+        // Двойной клик: переключаемся на resourceTimeGridDay
+        const dateStr = cell.getAttribute('data-date');
         ec.setOption('view', 'resourceTimeGridDay');
         ec.setDate(new Date(dateStr));
-    });
+    }
+
+    lastClickTime = now;
+});
 
     function createEvents() {
         let days = [];
