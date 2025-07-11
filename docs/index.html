@@ -37,6 +37,28 @@
 </main>
 
 <script type="text/javascript">
+    let touchStartX = 0;
+    let touchEndX = 0;
+    let isSwipe = false;
+
+    document.addEventListener("touchstart", function(e) {
+        isSwipe = false;
+        touchStartX = e.changedTouches[0].screenX;
+    });
+
+    document.addEventListener("touchend", function(e) {
+        touchEndX = e.changedTouches[0].screenX;
+        let delta = touchEndX - touchStartX;
+        if (Math.abs(delta) > 50) {
+            isSwipe = true;
+            if (delta > 0) {
+                ec.prev();
+            } else {
+                ec.next();
+            }
+        }
+    });
+
     const ec = EventCalendar.create(document.getElementById('ec'), {
         view: 'dayGridMonth',
         headerToolbar: {
@@ -59,13 +81,14 @@
                 slotMinTime: '09:00',
                 slotMaxTime: '21:00',
                 slotWidth: 16,
-                resources: []
+                resources: [ /* ...ресурсы опущены для краткости... */ ]
             }
         },
         dayMaxEvents: true,
         nowIndicator: true,
         selectable: true,
         dateClick: function(info) {
+            if (isSwipe) return; // защита от случайного tap после swipe
             ec.setOption('date', info.dateStr);
             ec.setOption('view', 'resourceTimeGridDay');
         }
@@ -99,30 +122,6 @@
     function _pad(num) {
         let norm = Math.floor(Math.abs(num));
         return (norm < 10 ? '0' : '') + norm;
-    }
-
-    // Добавляем свайп
-    let touchStartX = 0;
-    let touchEndX = 0;
-
-    document.addEventListener('touchstart', function (e) {
-        touchStartX = e.changedTouches[0].screenX;
-    }, false);
-
-    document.addEventListener('touchend', function (e) {
-        touchEndX = e.changedTouches[0].screenX;
-        handleSwipe();
-    }, false);
-
-    function handleSwipe() {
-        const diff = touchEndX - touchStartX;
-        if (Math.abs(diff) > 50) {
-            if (diff > 0) {
-                ec.prev();
-            } else {
-                ec.next();
-            }
-        }
     }
 </script>
 </body>
