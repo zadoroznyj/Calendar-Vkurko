@@ -31,12 +31,14 @@
     .mode-switcher span {
       color: #555;
       cursor: pointer;
-      padding: 4px 8px;
+      padding: 4px 12px;
       border-radius: 16px;
+      transition: background 0.2s, color 0.2s;
     }
 
     .mode-switcher .active {
-      background: #e0e0e0;
+      background: #000;
+      color: #fff;
       font-weight: 600;
     }
 
@@ -102,8 +104,8 @@
     }
 
     .day-footer .active .circle {
-      background: red;
-      color: white;
+      background: #000;
+      color: #fff;
     }
 
     .day-footer .day-name {
@@ -235,7 +237,7 @@
       const view = ec.getOption("view");
 
       const day = date.getDate();
-      const dow = date.toLocaleString('default', { weekday: 'short' });
+      const dow = date.toLocaleString('default', { weekday: 'long' });
       const monthShort = date.toLocaleString('default', { month: 'short' });
 
       if (view === "resourceTimeGridDay") {
