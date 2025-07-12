@@ -162,6 +162,7 @@
       timeFormat: 'H:mm',
       headerToolbar: false,
       height: "100%",
+            date: new Date().toISOString().slice(0, 10),
       resources: [
         { id: 1, title: "Наталья" },
         { id: 2, title: "Ирина" },
@@ -202,6 +203,8 @@
 
     document.getElementById("modeSwitcher").addEventListener("click", (e) => {
       if (e.target.dataset.view) {
+        const currentDate = ec.getOption("date");
+        ec.setOption("date", currentDate);
         ec.setOption("view", e.target.dataset.view);
         updateActiveMode(e.target.dataset.view);
         updateTitle();
