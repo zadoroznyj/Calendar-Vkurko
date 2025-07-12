@@ -26,8 +26,8 @@
             text-align: center;
         }
     </style>
-    <!-- Подключаем Google API JS -->
-    <script src="https://apis.google.com/js/api.js"></script>
+    <!-- Подключаем Google API JS с onload -->
+    <script src="https://apis.google.com/js/api.js" onload="handleClientLoad()"></script>
 </head>
 <body>
 <header class="row">
@@ -133,8 +133,8 @@
 
     // === Google API ===
 
-    const CLIENT_ID = "104760002655-tftfu479sjog0u3qj9oa145a8qo7a9t2.apps.googleusercontent.com";  // Заменить на свой Client ID из Google Cloud Console
-    const API_KEY = "AIzaSyDNHKvmGafvKU2P9yN-IXNjx6SbrpxEtIQ"; // Можно не обязательно, но желательно
+    const CLIENT_ID = "104760002655-tftfu479sjog0u3qj9oa145a8qo7a9t2.apps.googleusercontent.com";  
+    const API_KEY = "AIzaSyDNHKvmGafvKU2P9yN-IXNjx6SbrpxEtIQ"; 
     const DISCOVERY_DOCS = ["https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest"];
     const SCOPES = "https://www.googleapis.com/auth/calendar.readonly";
 
@@ -149,7 +149,6 @@
             discoveryDocs: DISCOVERY_DOCS,
             scope: SCOPES
         }).then(() => {
-            // Если не авторизован — авторизуем
             if (!gapi.auth2.getAuthInstance().isSignedIn.get()) {
                 gapi.auth2.getAuthInstance().signIn().then(loadCalendarEvents);
             } else {
@@ -160,7 +159,6 @@
         });
     }
 
-    // Получаем события из Google Календаря и добавляем в календарь ec
     function loadCalendarEvents() {
         gapi.client.calendar.events.list({
             'calendarId': 'primary',
@@ -176,10 +174,9 @@
                 return;
             }
             const ecEvents = events.map(ev => {
-                let start = ev.start.dateTime || ev.start.date; // all-day или с временем
+                let start = ev.start.dateTime || ev.start.date;
                 let end = ev.end.dateTime || ev.end.date;
 
-                // Формат EventCalendar требует "YYYY-MM-DD HH:mm" с пробелом
                 start = start.replace("T", " ").substring(0, 16);
                 end = end.replace("T", " ").substring(0, 16);
 
@@ -188,18 +185,14 @@
                     title: ev.summary || "Без названия",
                     start: start,
                     end: end,
-                    allDay: !!ev.start.date, // если all-day событие
-                    color: "#4285F4", // можно сделать цвет Google синий
+                    allDay: !!ev.start.date,
+                    color: "#4285F4",
                 };
             });
 
-            // Добавляем события в календарь
             ec.setOption("events", ecEvents);
         });
     }
-
-    // Запускаем загрузку Google API
-    handleClientLoad();
 </script>
 </body>
 </html>
