@@ -11,6 +11,8 @@
     body {
       margin: 0;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #fff;
+      color: #000;
     }
 
     header, footer {
@@ -77,17 +79,18 @@
     .day-footer {
       display: flex;
       justify-content: space-between;
-      font-size: 15px;
+      font-size: 13px;
       padding: 8px 16px;
     }
 
     .day-footer span {
-      width: 32px;
+      flex: 1;
       text-align: center;
       padding: 6px 0;
       border-radius: 20px;
       color: #999;
       cursor: pointer;
+      white-space: nowrap;
     }
 
     .day-footer .active {
@@ -125,7 +128,6 @@
   <script>
     let touchStartX = 0;
     let touchEndX = 0;
-    let blockTap = false;
     let lastClickedDate = null;
     let lastTapTime = 0;
 
@@ -144,21 +146,6 @@
       selectable: true,
       dayMaxEvents: true,
       scrollTime: "08:00:00",
-      views: {
-        timeGridWeek: { pointer: true },
-        resourceTimeGridWeek: { pointer: true },
-        resourceTimelineWeek: {
-          slotDuration: "00:15",
-          slotLabelInterval: "01:00",
-          slotMinTime: "09:00",
-          slotMaxTime: "21:00",
-          slotWidth: 16,
-        },
-      },
-      dateClick(info) {
-        lastClickedDate = info.dateStr;
-        lastTapTime = Date.now();
-      },
     });
 
     const calendarEl = document.getElementById("ec");
@@ -182,8 +169,6 @@
       touchEndX = e.changedTouches[0].screenX;
       let delta = touchEndX - touchStartX;
       if (Math.abs(delta) > 50) {
-        blockTap = true;
-        setTimeout(() => blockTap = false, 400);
         if (delta > 0) ec.prev();
         else ec.next();
         updateTitle();
@@ -199,18 +184,17 @@
     });
 
     document.getElementById("dayFooter").addEventListener("click", (e) => {
-      if (e.target.tagName === "SPAN") {
-        const offset = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].indexOf(e.target.textContent);
-        const baseDate = new Date(ec.getOption("date"));
-        const currentWeekday = (baseDate.getDay() + 6) % 7; // 0=Mon
-        const diff = offset - currentWeekday;
-        baseDate.setDate(baseDate.getDate() + diff);
-        const iso = baseDate.toISOString().slice(0, 10);
-        ec.setOption("date", iso);
+      if (e.target.tagName === "SPAN" && e.target.dataset.date) {
+        ec.setOption("date", e.target.dataset.date);
         ec.setOption("view", "resourceTimeGridDay");
         updateActiveMode("resourceTimeGridDay");
         updateTitle();
       }
+    });
+
+    ec.setOption("dateClick", function(info) {
+      lastClickedDate = info.dateStr;
+      lastTapTime = Date.now();
     });
 
     function updateActiveMode(viewName) {
@@ -218,6 +202,7 @@
         el.classList.toggle("active", el.dataset.view === viewName);
       });
       document.getElementById("dayFooter").style.display = viewName === "resourceTimeGridDay" ? "flex" : "none";
+      document.getElementById("monthFooter").style.display = viewName === "resourceTimeGridDay" ? "none" : "flex";
     }
 
     function updateTitle() {
@@ -225,26 +210,35 @@
       const date = new Date(dateStr);
       const view = ec.getOption("view");
 
-      const month = date.toLocaleString('default', { month: 'long' });
-      const year = date.getFullYear();
-      const dow = date.toLocaleString('default', { weekday: 'long' });
       const day = date.getDate();
+      const dow = date.toLocaleString('default', { weekday: 'short' });
+      const monthShort = date.toLocaleString('default', { month: 'short' });
 
       if (view === "resourceTimeGridDay") {
-        document.getElementById("calendarTitle").textContent = `${dow}, ${day} ${month}`;
+        document.getElementById("calendarTitle").textContent = `${dow}, ${day} ${monthShort}`;
         document.getElementById("calendarSubtitle").textContent = `Week ${getWeekNumber(date)}`;
-        updateDayFooter(date);
+        updateDayFooterWithDates(date);
       } else {
+        const month = date.toLocaleString('default', { month: 'long' });
+        const year = date.getFullYear();
         document.getElementById("calendarTitle").textContent = `${month} ${year}`;
         document.getElementById("calendarSubtitle").textContent = ``;
       }
     }
 
-    function updateDayFooter(date) {
-      const dayIndex = date.getDay(); // 0=Sun ... 6=Sat
-      const ordered = [1, 2, 3, 4, 5, 6, 0]; // Mon–Sun
-      document.querySelectorAll("#dayFooter span").forEach((el, i) => {
-        el.classList.toggle("active", ordered[i] === dayIndex);
+    function updateDayFooterWithDates(date) {
+      const startOfWeek = new Date(date);
+      startOfWeek.setDate(date.getDate() - ((date.getDay() + 6) % 7)); // Monday
+      const spans = document.querySelectorAll("#dayFooter span");
+
+      spans.forEach((el, i) => {
+        const d = new Date(startOfWeek);
+        d.setDate(d.getDate() + i);
+        const dow = d.toLocaleString('default', { weekday: 'short' });
+        const day = d.getDate();
+        el.textContent = `${dow} ${day}`;
+        el.dataset.date = d.toISOString().slice(0, 10);
+        el.classList.toggle("active", d.toDateString() === date.toDateString());
       });
     }
 
