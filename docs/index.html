@@ -219,3 +219,34 @@
 </body>
 </html>
 1gW4ZD30gfiZqzT8e2ZATtfFljxHr2tiyMS6l_HEwFEs
+function doGet() {
+  const ss = SpreadsheetApp.openById("1gW4ZD30gfiZqzT8e2ZATtfFljxHr2tiyMS6l_HEwFEs");
+  const sheet = ss.getSheetByName("Event");
+  const data = sheet.getDataRange().getValues();
+
+  const events = [];
+
+  // Предполагаем, что первая строка — заголовки, например:
+  // Название | Дата начала | Время начала | Дата окончания | Время окончания | РесурсId | Цвет
+  // 0        | 1           | 2            | 3              | 4               | 5        | 6
+
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+
+    if (!row[1]) continue; // если нет даты начала, пропускаем
+
+    // Формируем строку даты и времени для начала и конца
+    const startDateTime = row[1] + " " + (row[2] || "00:00");
+    const endDateTime = (row[3] || row[1]) + " " + (row[4] || "23:59");
+
+    events.push({
+      title: row[0] || "Без названия",
+      start: startDateTime,
+      end: endDateTime,
+      resourceId: row[5] || 1,
+      color: row[6] || "#3788d8"
+    });
+  }
+
+  return ContentService.createTextOutput(JSON.stringify(events)).setMimeType(ContentService.MimeType.JSON);
+}
