@@ -30,7 +30,7 @@
 <body>
 <header class="row">
     <button class="toggle-dark-button" title="Toggle dark mode" onclick="document.body.classList.toggle('ec-dark')">
-        <!-- иконки тут -->
+        🌙
     </button>
 </header>
 <main class="row">
@@ -64,6 +64,8 @@
 
     const ec = EventCalendar.create(document.getElementById("ec"), {
         view: "dayGridMonth",
+        firstDay: 1,  // Неделя начинается с понедельника
+        timeFormat: 'H:mm', // 24-часовой формат времени
         headerToolbar: {
             start: "prev,next today",
             center: "title",
@@ -76,14 +78,21 @@
         scrollTime: "09:00:00",
         events: createEvents(),
         views: {
-            timeGridWeek: { pointer: true },
-            resourceTimeGridWeek: { pointer: true },
+            timeGridWeek: {
+                pointer: true,
+                slotLabelFormat: { hour: '2-digit', minute: '2-digit', hour12: false },
+            },
+            resourceTimeGridWeek: {
+                pointer: true,
+                slotLabelFormat: { hour: '2-digit', minute: '2-digit', hour12: false },
+            },
             resourceTimelineWeek: {
                 slotDuration: "00:15",
                 slotLabelInterval: "01:00",
                 slotMinTime: "09:00",
                 slotMaxTime: "21:00",
                 slotWidth: 16,
+                slotLabelFormat: { hour: '2-digit', minute: '2-digit', hour12: false },
             },
         },
         dayMaxEvents: true,
@@ -104,7 +113,7 @@
             ec.setOption("date", lastClickedDate);
             ec.setOption("view", "resourceTimeGridDay");
         }
-        // иначе — ничего не делаем, тап был по пустой области
+        // Если двойной тап не по дате — ничего не делаем
     });
 
     function createEvents() {
