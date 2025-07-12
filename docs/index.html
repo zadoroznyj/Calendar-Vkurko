@@ -1,213 +1,228 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>EventCalendar</title>
-    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
-    <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png" />
-    <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png" />
-    <link rel="manifest" href="site.webmanifest" />
-    <link rel="stylesheet" href="global.css?20231021" />
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@event-calendar/build@4.5.0/dist/event-calendar.min.css" />
-    <script src="https://cdn.jsdelivr.net/npm/@event-calendar/build@4.5.0/dist/event-calendar.min.js"></script>
-    <script src="https://hammerjs.github.io/dist/hammer.min.js"></script>
-    <style>
-        .ec-timeline .ec-time,
-        .ec-timeline .ec-line {
-            width: 16px;
-        }
-        .ec-timeline .ec-time {
-            overflow: visible;
-        }
-        .ec-timeline .ec-time time {
-            display: inline-block;
-            width: 64px;
-            text-align: center;
-        }
-    </style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>EventCalendar</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@event-calendar/build@4.5.0/dist/event-calendar.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@event-calendar/build@4.5.0/dist/event-calendar.min.js"></script>
+  <script src="https://hammerjs.github.io/dist/hammer.min.js"></script>
+  <style>
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    header, footer {
+      padding: 8px 16px;
+      background: #fff;
+    }
+    .mode-switcher {
+      display: flex;
+      justify-content: space-around;
+      font-size: 16px;
+      padding: 8px 0;
+      font-weight: 500;
+    }
+    .mode-switcher span {
+      color: #555;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 16px;
+    }
+    .mode-switcher .active {
+      background: #e0e0e0;
+      font-weight: 600;
+    }
+    .calendar-title {
+      font-size: 22px;
+      font-weight: 600;
+      padding: 4px 16px;
+    }
+    .month-footer {
+      display: flex;
+      justify-content: space-around;
+      font-size: 15px;
+      padding: 8px 0;
+    }
+    .month-footer span {
+      color: #666;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 12px;
+    }
+    .month-footer .active {
+      background: #111;
+      color: #fff;
+    }
+    #ec {
+      height: calc(100vh - 144px);
+      width: 100%;
+    }
+  </style>
 </head>
 <body>
-<header class="row">
-    <button class="toggle-dark-button" title="Toggle dark mode" onclick="document.body.classList.toggle('ec-dark')">
-        🌙
-    </button>
-</header>
-<main class="row">
-    <div id="ec" class="col"></div>
-</main>
+  <header>
+    <div class="mode-switcher" id="modeSwitcher">
+      <span data-view="listWeek">List</span>
+      <span data-view="resourceTimeGridDay">Day</span>
+      <span data-view="resourceTimeGridWeek">Week</span>
+      <span data-view="dayGridMonth" class="active">Month</span>
+      <span data-view="resourceTimelineWeek">Planner</span>
+    </div>
+    <div class="calendar-title" id="calendarTitle">July 2025</div>
+  </header>
 
-<script>
+  <main>
+    <div id="ec"></div>
+  </main>
+
+  <footer>
+    <div class="month-footer" id="monthFooter">
+      <span>Apr</span><span>May</span><span>Jun</span><span class="active">Jul</span><span>Aug</span><span>Sep</span><span>Oct</span>
+    </div>
+  </footer>
+
+  <script>
     let touchStartX = 0;
     let touchEndX = 0;
     let blockTap = false;
     let lastClickedDate = null;
     let lastTapTime = 0;
-    let ec;
+
+    const ec = EventCalendar.create(document.getElementById("ec"), {
+      view: "dayGridMonth",
+      firstDay: 1,
+      timeFormat: 'H:mm',
+      headerToolbar: false,
+      height: "100%",
+      resources: [
+        { id: 1, title: "Наталья" },
+        { id: 2, title: "Ирина" },
+      ],
+      events: createEvents(),
+      nowIndicator: true,
+      selectable: true,
+      dayMaxEvents: true,
+      scrollTime: "09:00:00",
+      views: {
+        timeGridWeek: {
+          pointer: true,
+          slotLabelFormat: { hour: '2-digit', minute: '2-digit', hour24: false },
+        },
+        resourceTimeGridWeek: {
+          pointer: true,
+          slotLabelFormat: { hour: '2-digit', minute: '2-digit', hour24: false },
+        },
+        resourceTimelineWeek: {
+          slotDuration: "00:15",
+          slotLabelInterval: "01:00",
+          slotMinTime: "09:00",
+          slotMaxTime: "21:00",
+          slotWidth: 16,
+          slotLabelFormat: { hour: '2-digit', minute: '2-digit', hour24: false },
+        },
+      },
+      dateClick: function(info) {
+        lastClickedDate = info.dateStr;
+        lastTapTime = Date.now();
+      },
+    });
+
+    const calendarEl = document.getElementById("ec");
+    const hammer = new Hammer(calendarEl);
+    hammer.get("doubletap").set({ interval: 300 });
+
+    hammer.on("doubletap", function () {
+      if (lastClickedDate && Date.now() - lastTapTime < 600) {
+        ec.setOption("date", lastClickedDate);
+        ec.setOption("view", "resourceTimeGridDay");
+        updateActiveMode("resourceTimeGridDay");
+      }
+    });
 
     document.addEventListener("touchstart", function (e) {
-        touchStartX = e.changedTouches[0].screenX;
+      touchStartX = e.changedTouches[0].screenX;
     });
 
     document.addEventListener("touchend", function (e) {
-        touchEndX = e.changedTouches[0].screenX;
-        let delta = touchEndX - touchStartX;
-        if (Math.abs(delta) > 50) {
-            blockTap = true;
-            setTimeout(() => (blockTap = false), 400);
-            if (delta > 0) {
-                ec.prev();
-            } else {
-                ec.next();
-            }
+      touchEndX = e.changedTouches[0].screenX;
+      let delta = touchEndX - touchStartX;
+      if (Math.abs(delta) > 50) {
+        blockTap = true;
+        setTimeout(() => blockTap = false, 400);
+        if (delta > 0) {
+          ec.prev();
+        } else {
+          ec.next();
         }
+        updateTitle();
+      }
     });
 
-    async function loadEvents() {
-        try {
-            const response = await fetch("https://script.google.com/macros/s/AKfycbydJnukG6hcd7xUjCSqW1ChBLrJVh9iYCDH4h9OrgeJDW1VjuXUHCcixLjjwavA67U8iQ/exec");
-            if (!response.ok) throw new Error("Ошибка загрузки событий");
-            const events = await response.json();
-            return events;
-        } catch (e) {
-            console.error(e);
-            return [];
-        }
+    document.getElementById("modeSwitcher").addEventListener("click", (e) => {
+      if (e.target.dataset.view) {
+        ec.setOption("view", e.target.dataset.view);
+        updateActiveMode(e.target.dataset.view);
+      }
+    });
+
+    function updateActiveMode(viewName) {
+      document.querySelectorAll("#modeSwitcher span").forEach(el => {
+        el.classList.toggle("active", el.dataset.view === viewName);
+      });
     }
 
-    async function initCalendar() {
-        const events = await loadEvents();
-
-        ec = EventCalendar.create(document.getElementById("ec"), {
-            view: "dayGridMonth",
-            firstDay: 1,  // Неделя начинается с понедельника
-            timeFormat: 'H:mm', // 24-часовой формат времени
-            headerToolbar: {
-                start: "prev,next today",
-                center: "title",
-                end: "dayGridMonth,timeGridWeek,timeGridDay,listWeek resourceTimeGridWeek,resourceTimelineWeek",
-            },
-            resources: [
-                { id: 1, title: "Наталья" },
-                { id: 2, title: "Ирина" },
-            ],
-            scrollTime: "09:00:00",
-            events: events,
-            views: {
-                timeGridWeek: {
-                    pointer: true,
-                    slotLabelFormat: { hour: '2-digit', minute: '2-digit', hour24: false },
-                },
-                resourceTimeGridWeek: {
-                    pointer: true,
-                    slotLabelFormat: { hour: '2-digit', minute: '2-digit', hour24: false },
-                },
-                resourceTimelineWeek: {
-                    slotDuration: "00:15",
-                    slotLabelInterval: "01:00",
-                    slotMinTime: "09:00",
-                    slotMaxTime: "21:00",
-                    slotWidth: 16,
-                    slotLabelFormat: { hour: '2-digit', minute: '2-digit', hour24: false },
-                },
-            },
-            dayMaxEvents: true,
-            nowIndicator: true,
-            selectable: true,
-            dateClick: function (info) {
-                lastClickedDate = info.dateStr;
-                lastTapTime = Date.now();
-            },
-        });
-
-        const calendarEl = document.getElementById("ec");
-        const hammer = new Hammer(calendarEl);
-        hammer.get("doubletap").set({ interval: 300 });
-
-        hammer.on("doubletap", function () {
-            if (lastClickedDate && Date.now() - lastTapTime < 600) {
-                ec.setOption("date", lastClickedDate);
-                ec.setOption("view", "resourceTimeGridDay");
-            }
-            // Если двойной тап не по дате — ничего не делаем
-        });
+    function updateTitle() {
+      const date = ec.getOption("date");
+      const title = new Date(date);
+      const month = title.toLocaleString('default', { month: 'long' });
+      const year = title.getFullYear();
+      document.getElementById("calendarTitle").textContent = `${month} ${year}`;
     }
 
-    initCalendar();
-
-    // Функции _pad и createEvents оставил, но не вызываются
     function createEvents() {
-        let days = [];
-        for (let i = 0; i < 7; ++i) {
-            let day = new Date();
-            let diff = i - day.getDay();
-            day.setDate(day.getDate() + diff);
-            days[i] = day.getFullYear() + "-" + _pad(day.getMonth() + 1) + "-" + _pad(day.getDate());
-        }
+      let days = [];
+      for (let i = 0; i < 7; ++i) {
+        let day = new Date();
+        let diff = i - day.getDay();
+        day.setDate(day.getDate() + diff);
+        days[i] = day.getFullYear() + "-" + _pad(day.getMonth() + 1) + "-" + _pad(day.getDate());
+      }
 
-        return [
-            { start: days[0] + " 00:00", end: days[0] + " 09:00", resourceId: 1, display: "background" },
-            { start: days[1] + " 12:00", end: days[1] + " 14:00", resourceId: 2, display: "background" },
-            { start: days[2] + " 17:00", end: days[2] + " 24:00", resourceId: 1, display: "background" },
-            {
-                start: days[0] + " 10:00",
-                end: days[0] + " 14:00",
-                resourceId: 1,
-                title: "The calendar can display background and regular events",
-                color: "#FE6B64",
-            },
-            {
-                start: days[1] + " 16:00",
-                end: days[2] + " 08:00",
-                resourceId: 2,
-                title: "An event may span to another day",
-                color: "#B29DD9",
-            },
-            {
-                start: days[2] + " 09:00",
-                end: days[2] + " 13:00",
-                resourceId: 2,
-                title: "Events can be assigned to resources and the calendar has the resources view built-in",
-                color: "#779ECB",
-            },
-            { start: days[3] + " 14:00", end: days[3] + " 20:00", resourceId: 1, title: "", color: "#FE6B64" },
-            {
-                start: days[3] + " 15:00",
-                end: days[3] + " 18:00",
-                resourceId: 1,
-                title: "Overlapping events are positioned properly",
-                color: "#779ECB",
-            },
-            {
-                start: days[5] + " 10:00",
-                end: days[5] + " 16:00",
-                resourceId: 2,
-                title: { html: "You have complete control over the <i><b>display</b></i> of events…" },
-                color: "#779ECB",
-            },
-            {
-                start: days[5] + " 14:00",
-                end: days[5] + " 19:00",
-                resourceId: 2,
-                title: "…and you can drag and drop the events!",
-                color: "#FE6B64",
-            },
-            { start: days[5] + " 18:00", end: days[5] + " 21:00", resourceId: 2, title: "", color: "#B29DD9" },
-            {
-                start: days[1],
-                end: days[3],
-                resourceId: 1,
-                title: "All-day events can be displayed at the top",
-                color: "#B29DD9",
-                allDay: true,
-            },
-        ];
+      return [
+        { start: days[0] + " 00:00", end: days[0] + " 09:00", resourceId: 1, display: "background" },
+        { start: days[1] + " 12:00", end: days[1] + " 14:00", resourceId: 2, display: "background" },
+        { start: days[2] + " 17:00", end: days[2] + " 24:00", resourceId: 1, display: "background" },
+        {
+          start: days[0] + " 10:00",
+          end: days[0] + " 14:00",
+          resourceId: 1,
+          title: "Background and regular events",
+          color: "#FE6B64",
+        },
+        {
+          start: days[1] + " 16:00",
+          end: days[2] + " 08:00",
+          resourceId: 2,
+          title: "Multi-day event",
+          color: "#B29DD9",
+        },
+        {
+          start: days[2] + " 09:00",
+          end: days[2] + " 13:00",
+          resourceId: 2,
+          title: "Assigned to resource",
+          color: "#779ECB",
+        },
+      ];
     }
 
     function _pad(num) {
-        let norm = Math.floor(Math.abs(num));
-        return (norm < 10 ? "0" : "") + norm;
+      let norm = Math.floor(Math.abs(num));
+      return (norm < 10 ? "0" : "") + norm;
     }
-</script>
+
+    updateTitle();
+  </script>
 </body>
 </html>
