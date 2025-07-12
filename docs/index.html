@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>EventCalendar</title>
     <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
     <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png" />
@@ -32,6 +32,7 @@
             color: #333;
             margin: 0;
             padding: 0;
+            height: 100vh;
         }
         body.ec-dark {
             background-color: #1a1a1a;
@@ -40,7 +41,7 @@
         .row {
             display: flex;
             flex-direction: column;
-            align-items: center;
+            align-items: stretch;
             padding: 0;
             width: 100%;
         }
@@ -66,15 +67,15 @@
         main {
             margin-top: 60px;
             width: 100%;
-            max-width: 100%;
-            overflow-x: hidden;
+            flex: 1;
+            overflow: auto;
         }
         #ec {
             background-color: #fff;
             border-radius: 0;
             box-shadow: none;
             width: 100%;
-            max-width: 100%;
+            height: 100%;
             overflow: hidden;
         }
         .ec-day-grid .ec-day {
@@ -153,7 +154,7 @@
     <button class="toggle-dark-button" title="Toggle dark mode" onclick="document.body.classList.toggle('ec-dark')">
         🌙
     </button>
-    <div>11:52 AM EEST</div>
+    <div>11:57 AM EEST</div>
 </header>
 <main class="row">
     <div id="ec" class="col"></div>
@@ -278,7 +279,7 @@
                 end: days[3] + " 18:00",
                 resourceId: 1,
                 title: "Overlapping events are positioned properly",
-                color: #779ECB",
+                color: "#779ECB",
             },
             {
                 start: days[5] + " 10:00",
