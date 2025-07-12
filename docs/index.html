@@ -31,14 +31,12 @@
     .mode-switcher span {
       color: #555;
       cursor: pointer;
-      padding: 4px 12px;
+      padding: 4px 8px;
       border-radius: 16px;
-      transition: background 0.2s, color 0.2s;
     }
 
     .mode-switcher .active {
-      background: #000;
-      color: #fff;
+      background: #e0e0e0;
       font-weight: 600;
     }
 
@@ -104,8 +102,8 @@
     }
 
     .day-footer .active .circle {
-      background: #000;
-      color: #fff;
+      background: red;
+      color: white;
     }
 
     .day-footer .day-name {
@@ -124,19 +122,54 @@
       line-height: 1;
       margin-top: 2px;
     }
+
+    /* Day View Styles */
+    .ec-time-axis .ec-time {
+      font-size: 14px;
+      color: #666;
+      width: 50px;
+      text-align: right;
+      padding-right: 10px;
+    }
+
+    .ec-day-grid .ec-event {
+      margin: 2px 0;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 14px;
+      color: #fff;
+    }
+
+    .ec-day-grid .ec-event:nth-child(1) {
+      background-color: #2e8b57; /* Зеленый для первого события */
+    }
+
+    .ec-day-grid .ec-event:nth-child(2) {
+      background-color: #4682b4; /* Синий для второго события */
+    }
+
+    .ec-day-grid .ec-background-event {
+      background-color: #d3d3d3;
+      opacity: 0.5;
+      margin: 2px 0;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 14px;
+      color: #333;
+    }
   </style>
 </head>
 <body>
   <header>
     <div class="mode-switcher" id="modeSwitcher">
       <span data-view="listWeek">List</span>
-      <span data-view="resourceTimeGridDay">Day</span>
+      <span data-view="resourceTimeGridDay" class="active">Day</span>
       <span data-view="resourceTimeGridWeek">Week</span>
-      <span data-view="dayGridMonth" class="active">Month</span>
+      <span data-view="dayGridMonth">Month</span>
       <span data-view="resourceTimelineWeek">Planner</span>
     </div>
-    <div class="calendar-title" id="calendarTitle">July 2025</div>
-    <div class="calendar-subtitle" id="calendarSubtitle"></div>
+    <div class="calendar-title" id="calendarTitle">Wednesday, 16 Jul</div>
+    <div class="calendar-subtitle" id="calendarSubtitle">Week 29</div>
   </header>
 
   <main>
@@ -144,10 +177,54 @@
   </main>
 
   <footer>
-    <div class="month-footer" id="monthFooter">
+    <div class="month-footer" id="monthFooter" style="display: none;">
       <span>Apr</span><span>May</span><span>Jun</span><span class="active">Jul</span><span>Aug</span><span>Sep</span><span>Oct</span>
     </div>
-    <div class="day-footer" id="dayFooter" style="display: none;"></div>
+    <div class="day-footer" id="dayFooter">
+      <div class="day-item" data-date="2025-07-14">
+        <div class="circle">
+          <div class="day-name">Mon</div>
+          <div class="day-number">14</div>
+        </div>
+      </div>
+      <div class="day-item" data-date="2025-07-15">
+        <div class="circle">
+          <div class="day-name">Tue</div>
+          <div class="day-number">15</div>
+        </div>
+      </div>
+      <div class="day-item active" data-date="2025-07-16">
+        <div class="circle">
+          <div class="day-name">Wed</div>
+          <div class="day-number">16</div>
+          <div class="day-month">Jul</div>
+        </div>
+      </div>
+      <div class="day-item" data-date="2025-07-17">
+        <div class="circle">
+          <div class="day-name">Thu</div>
+          <div class="day-number">17</div>
+        </div>
+      </div>
+      <div class="day-item" data-date="2025-07-18">
+        <div class="circle">
+          <div class="day-name">Fri</div>
+          <div class="day-number">18</div>
+        </div>
+      </div>
+      <div class="day-item" data-date="2025-07-19">
+        <div class="circle">
+          <div class="day-name">Sat</div>
+          <div class="day-number">19</div>
+        </div>
+      </div>
+      <div class="day-item" data-date="2025-07-20">
+        <div class="circle">
+          <div class="day-name">Sun</div>
+          <div class="day-number">20</div>
+        </div>
+      </div>
+    </div>
   </footer>
 
   <script>
@@ -157,7 +234,7 @@
     let lastTapTime = 0;
 
     const ec = EventCalendar.create(document.getElementById("ec"), {
-      view: "dayGridMonth",
+      view: "resourceTimeGridDay",
       firstDay: 1,
       timeFormat: 'H:mm',
       headerToolbar: false,
@@ -291,28 +368,28 @@
     }
 
     function createEvents() {
-      const today = new Date().toISOString().slice(0, 10);
+      const today = new Date('2025-07-16').toISOString().slice(0, 10);
       return [
         {
-          start: today + "T08:39:00",
-          end: today + "T10:39:00",
-          title: "Наращивание: Full Colour Short",
+          start: today + "T10:24:00",
+          end: today + "T12:24:00",
+          title: "Стрижка: Botox: Leonid Zadoroznyj (Передано Н...)",
           resourceId: 1,
           color: "#2e8b57",
         },
         {
-          start: today + "T08:39:00",
-          end: today + "T10:39:00",
-          title: "Full Colour Short: Leonid Zadoroznyj",
+          start: today + "T09:24:00",
+          end: today + "T12:24:00",
+          title: "Botox: Leonid Zadoroznyj",
           resourceId: 2,
           color: "#4682b4",
         },
         {
-          start: today,
-          title: "💵 Зарплата",
-          allDay: true,
+          start: today + "T12:24:00",
+          end: today + "T14:24:00",
+          title: "HELP (Стрижка)",
           resourceId: 2,
-          color: "#8888ff"
+          color: "#4682b4",
         }
       ];
     }
