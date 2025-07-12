@@ -26,6 +26,8 @@
             text-align: center;
         }
     </style>
+    <!-- Подключаем Google API JS -->
+    <script src="https://apis.google.com/js/api.js"></script>
 </head>
 <body>
 <header class="row">
@@ -63,9 +65,10 @@
         }
     });
 
+    // Календарь EventCalendar (пока без событий)
     const ec = EventCalendar.create(document.getElementById("ec"), {
         view: "dayGridMonth",
-        firstDay: 1,  // Неделя начинается с понедельника
+        firstDay: 1,
         headerToolbar: {
             start: "prev,next today",
             center: "title",
@@ -76,7 +79,7 @@
             { id: 2, title: "Ирина" },
         ],
         scrollTime: "09:00:00",
-        events: createEvents(),
+        events: [],  // Пусто — позже загрузим события из Google
         views: {
             timeGridWeek: {
                 pointer: true,
@@ -117,10 +120,10 @@
         },
     });
 
+    // Свайп для навигации
     const calendarEl = document.getElementById("ec");
     const hammer = new Hammer(calendarEl);
     hammer.get("doubletap").set({ interval: 300 });
-
     hammer.on("doubletap", function () {
         if (lastClickedDate && Date.now() - lastTapTime < 600) {
             ec.setOption("date", lastClickedDate);
@@ -128,78 +131,75 @@
         }
     });
 
-    function createEvents() {
-        let days = [];
-        for (let i = 0; i < 7; ++i) {
-            let day = new Date();
-            let diff = i - day.getDay();
-            day.setDate(day.getDate() + diff);
-            days[i] = day.getFullYear() + "-" + _pad(day.getMonth() + 1) + "-" + _pad(day.getDate());
-        }
+    // === Google API ===
 
-        return [
-            { start: days[0] + " 00:00", end: days[0] + " 09:00", resourceId: 1, display: "background" },
-            { start: days[1] + " 12:00", end: days[1] + " 14:00", resourceId: 2, display: "background" },
-            { start: days[2] + " 17:00", end: days[3] + " 00:00", resourceId: 1, display: "background" },  // заменил 24:00 на 00:00 следующего дня
-            {
-                start: days[0] + " 10:00",
-                end: days[0] + " 14:00",
-                resourceId: 1,
-                title: "The calendar can display background and regular events",
-                color: "#FE6B64",
-            },
-            {
-                start: days[1] + " 16:00",
-                end: days[2] + " 08:00",
-                resourceId: 2,
-                title: "An event may span to another day",
-                color: "#B29DD9",
-            },
-            {
-                start: days[2] + " 09:00",
-                end: days[2] + " 13:00",
-                resourceId: 2,
-                title: "Events can be assigned to resources and the calendar has the resources view built-in",
-                color: "#779ECB",
-            },
-            { start: days[3] + " 14:00", end: days[3] + " 20:00", resourceId: 1, title: "", color: "#FE6B64" },
-            {
-                start: days[3] + " 15:00",
-                end: days[3] + " 18:00",
-                resourceId: 1,
-                title: "Overlapping events are positioned properly",
-                color: "#779ECB",
-            },
-            {
-                start: days[5] + " 10:00",
-                end: days[5] + " 16:00",
-                resourceId: 2,
-                title: { html: "You have complete control over the <i><b>display</b></i> of events…" },
-                color: "#779ECB",
-            },
-            {
-                start: days[5] + " 14:00",
-                end: days[5] + " 19:00",
-                resourceId: 2,
-                title: "…and you can drag and drop the events!",
-                color: "#FE6B64",
-            },
-            { start: days[5] + " 18:00", end: days[5] + " 21:00", resourceId: 2, title: "", color: "#B29DD9" },
-            {
-                start: days[1],
-                end: days[3],
-                resourceId: 1,
-                title: "All-day events can be displayed at the top",
-                color: "#B29DD9",
-                allDay: true,
-            },
-        ];
+    const CLIENT_ID = "YOUR_CLIENT_ID.apps.googleusercontent.com";  // Заменить на свой Client ID из Google Cloud Console
+    const API_KEY = "YOUR_API_KEY"; // Можно не обязательно, но желательно
+    const DISCOVERY_DOCS = ["https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest"];
+    const SCOPES = "https://www.googleapis.com/auth/calendar.readonly";
+
+    function handleClientLoad() {
+        gapi.load('client:auth2', initClient);
     }
 
-    function _pad(num) {
-        let norm = Math.floor(Math.abs(num));
-        return (norm < 10 ? "0" : "") + norm;
+    function initClient() {
+        gapi.client.init({
+            apiKey: API_KEY,
+            clientId: CLIENT_ID,
+            discoveryDocs: DISCOVERY_DOCS,
+            scope: SCOPES
+        }).then(() => {
+            // Если не авторизован — авторизуем
+            if (!gapi.auth2.getAuthInstance().isSignedIn.get()) {
+                gapi.auth2.getAuthInstance().signIn().then(loadCalendarEvents);
+            } else {
+                loadCalendarEvents();
+            }
+        }, (error) => {
+            console.error("Error loading Google API client:", error);
+        });
     }
+
+    // Получаем события из Google Календаря и добавляем в календарь ec
+    function loadCalendarEvents() {
+        gapi.client.calendar.events.list({
+            'calendarId': 'primary',
+            'timeMin': (new Date()).toISOString(),
+            'showDeleted': false,
+            'singleEvents': true,
+            'maxResults': 100,
+            'orderBy': 'startTime'
+        }).then(response => {
+            const events = response.result.items;
+            if (!events || events.length === 0) {
+                console.log('No upcoming events found.');
+                return;
+            }
+            const ecEvents = events.map(ev => {
+                let start = ev.start.dateTime || ev.start.date; // all-day или с временем
+                let end = ev.end.dateTime || ev.end.date;
+
+                // Формат EventCalendar требует "YYYY-MM-DD HH:mm" с пробелом
+                start = start.replace("T", " ").substring(0, 16);
+                end = end.replace("T", " ").substring(0, 16);
+
+                return {
+                    id: ev.id,
+                    title: ev.summary || "Без названия",
+                    start: start,
+                    end: end,
+                    allDay: !!ev.start.date, // если all-day событие
+                    color: "#4285F4", // можно сделать цвет Google синий
+                };
+            });
+
+            // Добавляем события в календарь
+            ec.setOption("events", ecEvents);
+        });
+    }
+
+    // Запускаем загрузку Google API
+    handleClientLoad();
 </script>
 </body>
 </html>
