@@ -97,26 +97,26 @@
     hammer.get("doubletap").set({ interval: 300 });
 
     hammer.on("doubletap", function (ev) {
-        let el = ev.target;
-        // Идём вверх по DOM в поисках data-date
-        while (el && !el.hasAttribute("data-date")) {
-            el = el.parentElement;
-        }
-        if (!el) {
-            alert("Дата не найдена (нет data-date)");
-            return;
-        }
-        const dateStr = el.getAttribute("data-date");
-        if (!dateStr) {
-            alert("Дата не найдена (атрибут пуст)");
-            return;
-        }
-        alert("Двойной тап на дате: " + dateStr);
+    // Ищем родителя с классом ec-day и data-date
+    let el = ev.target.closest(".ec-day[data-date]");
+    if (!el) {
+        // fallback: используем текущую дату календаря
+        const fallback = ec.getOption("date");
+        alert("Дата не найдена, используем текущую: " + fallback);
+        ec.setOption("date", fallback);
+        ec.setOption("view", "resourceTimeGridDay");
+        return;
+    }
 
-        // Когда проверишь — раскомментируй для перехода:
-        // ec.setOption("date", dateStr);
-        // ec.setOption("view", "resourceTimeGridDay");
-    });
+    const dateStr = el.getAttribute("data-date");
+    if (!dateStr) {
+        alert("Дата не найдена (атрибут пуст)");
+        return;
+    }
+
+    ec.setOption("date", dateStr);
+    ec.setOption("view", "resourceTimeGridDay");
+});
 
     function createEvents() {
         let days = [];
