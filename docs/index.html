@@ -27,7 +27,8 @@
       padding: 8px 0;
       font-weight: 500;
       background: #000;
-      border-radius: 16px;
+      border-radius: 16px 16px 0 0; /* Закругление только сверху */
+      width: 100%;
     }
 
     .mode-switcher span {
@@ -49,7 +50,7 @@
       padding: 4px 16px;
       background: #000;
       color: #fff;
-      border-radius: 16px;
+      border-radius: 16px 16px 0 0; /* Закругление только сверху для Day View */
     }
 
     .calendar-subtitle {
@@ -110,7 +111,7 @@
     .day-footer .active .circle {
       background: #000;
       color: white;
-      border-radius: 20px; /* Овал вместо круга */
+      border-radius: 20px; /* Черный овал вместо круга */
     }
 
     .day-footer .day-name {
