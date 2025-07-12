@@ -254,26 +254,29 @@
     const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
     const today = new Date();
     const currentMonthIndex = currentDate.getMonth();
+    const currentYear = currentDate.getFullYear();
 
     footer.innerHTML = "";
 
-    for (let i = -2; i <= 2; i++) {
-      const index = (currentMonthIndex + i + 12) % 12;
+    for (let i = -3; i <= 3; i++) {
+      const date = new Date(currentYear, currentMonthIndex + i, 1);
+      const index = date.getMonth();
+      const year = date.getFullYear();
+
       const span = document.createElement("span");
       span.textContent = months[index];
       span.dataset.month = index;
-      span.classList.toggle("active", index === currentMonthIndex);
+      span.classList.toggle("active", i === 0);
 
-      const isTodayMonth = index === today.getMonth();
-      const isVisibleRange = Math.abs(i) <= 2;
-      const isSelected = index === currentMonthIndex;
+      const isTodayMonth = index === today.getMonth() && year === today.getFullYear();
+      const isSelected = i === 0;
 
-      if (isTodayMonth && !isSelected && isVisibleRange) {
+      if (isTodayMonth && !isSelected) {
         span.classList.add("current-month");
       }
 
       span.addEventListener("click", () => {
-        const newDate = new Date(currentDate.getFullYear(), index, 1);
+        const newDate = new Date(currentYear, index, 1);
         ec.setOption("date", newDate.toISOString().slice(0, 10));
         ec.setOption("view", "dayGridMonth");
         updateTitle();
