@@ -14,12 +14,10 @@
       background: #fff;
       color: #000;
     }
-
     header, footer {
       padding: 8px 16px;
       background: #fff;
     }
-
     .mode-switcher {
       display: flex;
       justify-content: space-around;
@@ -27,7 +25,6 @@
       padding: 8px 0;
       font-weight: 500;
     }
-
     .mode-switcher span {
       color: #555;
       cursor: pointer;
@@ -35,49 +32,41 @@
       border-radius: 16px;
       transition: background 0.2s, color 0.2s;
     }
-
     .mode-switcher .active {
       background: #000;
       color: #fff;
       font-weight: 600;
     }
-
     .calendar-title {
       font-size: 22px;
       font-weight: 600;
       padding: 4px 16px;
     }
-
     .calendar-subtitle {
       font-size: 14px;
       padding-left: 16px;
       color: #999;
     }
-
     .month-footer {
       display: flex;
       justify-content: space-around;
       font-size: 15px;
       padding: 8px 0;
     }
-
     .month-footer span {
       color: #666;
       cursor: pointer;
       padding: 4px 8px;
       border-radius: 12px;
     }
-
     .month-footer .active {
       background: #111;
       color: #fff;
     }
-
     #ec {
       width: 100%;
       height: calc(100vh - 200px);
     }
-
     .day-footer {
       display: flex;
       justify-content: space-around;
@@ -85,14 +74,12 @@
       background: #fff;
       font-size: 13px;
     }
-
     .day-footer .day-item {
       flex: 1;
       text-align: center;
       cursor: pointer;
       color: #666;
     }
-
     .day-footer .circle {
       display: flex;
       flex-direction: column;
@@ -102,23 +89,19 @@
       height: 40px;
       border-radius: 50%;
     }
-
     .day-footer .active .circle {
       background: #000;
       color: #fff;
     }
-
     .day-footer .day-name {
       font-size: 11px;
       line-height: 1;
     }
-
     .day-footer .day-number {
       font-size: 15px;
       font-weight: 600;
       line-height: 1;
     }
-
     .day-footer .day-month {
       font-size: 10px;
       line-height: 1;
@@ -159,13 +142,7 @@
     const ec = EventCalendar.create(document.getElementById("ec"), {
       view: "dayGridMonth",
       firstDay: 1,
-      timeFormat: 'H:mm',
-      slotLabelFormat: [{ hour: '2-digit', minute: '2-digit', hour12: false }],
-      eventTimeFormat: { hour: '2-digit', minute: '2-digit', hour12: false },
-      dayHeaderFormat: { weekday: 'short' },
-      slotMinTime: '07:00:00',
-      slotMaxTime: '22:00:00',
-      slotLabelInterval: '01:00',
+      timeFormat: 'HH:mm',
       headerToolbar: false,
       height: "100%",
       date: new Date().toISOString().slice(0, 10),
@@ -178,6 +155,13 @@
       selectable: true,
       dayMaxEvents: true,
       scrollTime: "08:00:00",
+      slotMinTime: "06:00:00",
+      slotMaxTime: "22:00:00",
+      slotLabelFormat: {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      }
     });
 
     const calendarEl = document.getElementById("ec");
@@ -303,15 +287,15 @@
       const today = new Date().toISOString().slice(0, 10);
       return [
         {
-          start: today + "T08:00:00",
-          end: today + "T10:00:00",
+          start: today + "T08:39:00",
+          end: today + "T10:39:00",
           title: "Наращивание: Full Colour Short",
           resourceId: 1,
           color: "#2e8b57",
         },
         {
-          start: today + "T13:00:00",
-          end: today + "T15:00:00",
+          start: today + "T08:39:00",
+          end: today + "T10:39:00",
           title: "Full Colour Short: Leonid Zadoroznyj",
           resourceId: 2,
           color: "#4682b4",
