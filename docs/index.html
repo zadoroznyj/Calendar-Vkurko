@@ -51,7 +51,7 @@
       display: flex;
       justify-content: space-around;
       font-size: 16px;
-      padding: 10px 0px; /* ← изменено: было 8px, стало 8px 32px */
+      padding: 10px 0px;
     }
     .month-footer span {
       color: #664;
@@ -74,7 +74,7 @@
     .day-footer {
       display: flex;
       justify-content: space-around;
-      padding: 4px 4px;
+      padding: 8px 0;
       background: #fff;
       font-size: 14px;
     }
@@ -89,9 +89,9 @@
       flex-direction: column;
       justify-content: center;
       align-items: center;
-      width: 67px;
-      height: 42px;
-      border-radius: 51%;
+      padding: 4px 12px;
+      border-radius: 16px;
+      transition: background 0.2s, color 0.2s;
     }
     .day-footer .active .circle {
       background: #000;
