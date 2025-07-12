@@ -97,24 +97,28 @@
     hammer.get("doubletap").set({ interval: 300 });
 
     hammer.on("doubletap", function (ev) {
-    // Ищем родителя с классом ec-day и data-date
-    let el = ev.target.closest(".ec-day[data-date]");
-    if (!el) {
-        // fallback: используем текущую дату календаря
+    const touch = ev.pointers?.[0] || ev.srcEvent;
+    const x = touch.clientX;
+    const y = touch.clientY;
+
+    // Определяем элемент, по которому был тап
+    const tappedElement = document.elementFromPoint(x, y);
+    const cell = tappedElement?.closest("[data-date]");
+
+    let dateStr = null;
+
+    if (cell) {
+        dateStr = cell.getAttribute("data-date");
+    }
+
+    if (!dateStr) {
         const fallback = ec.getOption("date");
         alert("Дата не найдена, используем текущую: " + fallback);
         ec.setOption("date", fallback);
-        ec.setOption("view", "resourceTimeGridDay");
-        return;
+    } else {
+        ec.setOption("date", dateStr);
     }
 
-    const dateStr = el.getAttribute("data-date");
-    if (!dateStr) {
-        alert("Дата не найдена (атрибут пуст)");
-        return;
-    }
-
-    ec.setOption("date", dateStr);
     ec.setOption("view", "resourceTimeGridDay");
 });
 
