@@ -98,16 +98,10 @@
     hammer.get("doubletap").set({ interval: 300 });
 
     hammer.on("doubletap", function () {
-        let dateStr = lastClickedDate;
-        if (!dateStr) {
-            dateStr = ec.getOption("date");
-            alert("Дата не выбрана ранее, используем текущую: " + dateStr);
-        } else {
-            alert("Двойной тап: " + dateStr);
-        }
-        ec.setOption("date", dateStr);
-        ec.setOption("view", "resourceTimeGridDay");
-    });
+    let dateStr = lastClickedDate || ec.getOption("date");
+    ec.setOption("date", dateStr);
+    ec.setOption("view", "resourceTimeGridDay");
+});
 
     function createEvents() {
         let days = [];
