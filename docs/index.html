@@ -97,8 +97,22 @@
     const hammer = new Hammer(calendarEl);
     hammer.get("doubletap").set({ interval: 300 });
 
-    hammer.on("doubletap", function () {
-    let dateStr = lastClickedDate || ec.getOption("date");
+    hammer.on("doubletap", function (ev) {
+    const touch = ev.pointers?.[0] || ev.srcEvent;
+    const x = touch.clientX;
+    const y = touch.clientY;
+
+    // Получаем элемент под пальцем
+    const el = document.elementFromPoint(x, y);
+    if (!el) return;
+
+    // Проверим все родители до .ec-cell
+    const cell = el.closest(".ec-cell");
+    if (!cell) return;
+
+    const dateStr = cell.dataset.date;
+    if (!dateStr) return;
+
     ec.setOption("date", dateStr);
     ec.setOption("view", "resourceTimeGridDay");
 });
