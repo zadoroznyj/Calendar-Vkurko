@@ -41,6 +41,7 @@
     let touchStartX = 0;
     let touchEndX = 0;
     let blockTap = false;
+    let lastClickedDate = null; // <--- сохраняем дату последнего одиночного тапа
 
     document.addEventListener("touchstart", function (e) {
         touchStartX = e.changedTouches[0].screenX;
@@ -88,7 +89,7 @@
         nowIndicator: true,
         selectable: true,
         dateClick: function (info) {
-            // отключаем одиночный тап
+            lastClickedDate = info.dateStr; // <--- сохраняем дату
         },
     });
 
@@ -96,31 +97,17 @@
     const hammer = new Hammer(calendarEl);
     hammer.get("doubletap").set({ interval: 300 });
 
-    hammer.on("doubletap", function (ev) {
-    const touch = ev.pointers?.[0] || ev.srcEvent;
-    const x = touch.clientX;
-    const y = touch.clientY;
-
-    // Определяем элемент, по которому был тап
-    const tappedElement = document.elementFromPoint(x, y);
-    const cell = tappedElement?.closest("[data-date]");
-
-    let dateStr = null;
-
-    if (cell) {
-        dateStr = cell.getAttribute("data-date");
-    }
-
-    if (!dateStr) {
-        const fallback = ec.getOption("date");
-        alert("Дата не найдена, используем текущую: " + fallback);
-        ec.setOption("date", fallback);
-    } else {
+    hammer.on("doubletap", function () {
+        let dateStr = lastClickedDate;
+        if (!dateStr) {
+            dateStr = ec.getOption("date");
+            alert("Дата не выбрана ранее, используем текущую: " + dateStr);
+        } else {
+            alert("Двойной тап: " + dateStr);
+        }
         ec.setOption("date", dateStr);
-    }
-
-    ec.setOption("view", "resourceTimeGridDay");
-});
+        ec.setOption("view", "resourceTimeGridDay");
+    });
 
     function createEvents() {
         let days = [];
