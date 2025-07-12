@@ -235,3 +235,22 @@
 
 </body>
 </html>
+function doGet() {
+  const ss = SpreadsheetApp.openById("ВАШ_ID_ТАБЛИЦЫ_ЗДЕСЬ");
+  const sheet = ss.getSheetByName("Sheet1"); // или название листа с данными
+  const data = sheet.getDataRange().getValues();
+
+  const headers = data.shift(); // первая строка — заголовки
+
+  const events = data.map(row => {
+    let obj = {};
+    headers.forEach((h, i) => obj[h] = row[i]);
+    // allDay нужно привести к булеву типу
+    obj.allDay = (obj.allDay === true || obj.allDay === "true");
+    return obj;
+  });
+
+  return ContentService
+    .createTextOutput(JSON.stringify(events))
+    .setMimeType(ContentService.MimeType.JSON);
+}
