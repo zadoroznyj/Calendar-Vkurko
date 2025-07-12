@@ -12,10 +12,12 @@
       margin: 0;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     }
+
     header, footer {
       padding: 8px 16px;
       background: #fff;
     }
+
     .mode-switcher {
       display: flex;
       justify-content: space-around;
@@ -23,40 +25,74 @@
       padding: 8px 0;
       font-weight: 500;
     }
+
     .mode-switcher span {
       color: #555;
       cursor: pointer;
       padding: 4px 8px;
       border-radius: 16px;
     }
+
     .mode-switcher .active {
       background: #e0e0e0;
       font-weight: 600;
     }
+
     .calendar-title {
       font-size: 22px;
       font-weight: 600;
       padding: 4px 16px;
     }
+
+    .calendar-subtitle {
+      font-size: 14px;
+      padding-left: 16px;
+      color: #999;
+    }
+
     .month-footer {
       display: flex;
       justify-content: space-around;
       font-size: 15px;
       padding: 8px 0;
     }
+
     .month-footer span {
       color: #666;
       cursor: pointer;
       padding: 4px 8px;
       border-radius: 12px;
     }
+
     .month-footer .active {
       background: #111;
       color: #fff;
     }
+
     #ec {
-      height: calc(100vh - 144px);
       width: 100%;
+      height: calc(100vh - 200px);
+    }
+
+    .day-footer {
+      display: flex;
+      justify-content: space-between;
+      font-size: 15px;
+      padding: 8px 16px;
+    }
+
+    .day-footer span {
+      width: 32px;
+      text-align: center;
+      padding: 6px 0;
+      border-radius: 20px;
+      color: #999;
+      cursor: pointer;
+    }
+
+    .day-footer .active {
+      background: red;
+      color: white;
     }
   </style>
 </head>
@@ -70,6 +106,7 @@
       <span data-view="resourceTimelineWeek">Planner</span>
     </div>
     <div class="calendar-title" id="calendarTitle">July 2025</div>
+    <div class="calendar-subtitle" id="calendarSubtitle"></div>
   </header>
 
   <main>
@@ -79,6 +116,9 @@
   <footer>
     <div class="month-footer" id="monthFooter">
       <span>Apr</span><span>May</span><span>Jun</span><span class="active">Jul</span><span>Aug</span><span>Sep</span><span>Oct</span>
+    </div>
+    <div class="day-footer" id="dayFooter" style="display: none;">
+      <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
     </div>
   </footer>
 
@@ -103,26 +143,19 @@
       nowIndicator: true,
       selectable: true,
       dayMaxEvents: true,
-      scrollTime: "09:00:00",
+      scrollTime: "08:00:00",
       views: {
-        timeGridWeek: {
-          pointer: true,
-          slotLabelFormat: { hour: '2-digit', minute: '2-digit', hour24: false },
-        },
-        resourceTimeGridWeek: {
-          pointer: true,
-          slotLabelFormat: { hour: '2-digit', minute: '2-digit', hour24: false },
-        },
+        timeGridWeek: { pointer: true },
+        resourceTimeGridWeek: { pointer: true },
         resourceTimelineWeek: {
           slotDuration: "00:15",
           slotLabelInterval: "01:00",
           slotMinTime: "09:00",
           slotMaxTime: "21:00",
           slotWidth: 16,
-          slotLabelFormat: { hour: '2-digit', minute: '2-digit', hour24: false },
         },
       },
-      dateClick: function(info) {
+      dateClick(info) {
         lastClickedDate = info.dateStr;
         lastTapTime = Date.now();
       },
@@ -137,24 +170,22 @@
         ec.setOption("date", lastClickedDate);
         ec.setOption("view", "resourceTimeGridDay");
         updateActiveMode("resourceTimeGridDay");
+        updateTitle();
       }
     });
 
-    document.addEventListener("touchstart", function (e) {
+    document.addEventListener("touchstart", e => {
       touchStartX = e.changedTouches[0].screenX;
     });
 
-    document.addEventListener("touchend", function (e) {
+    document.addEventListener("touchend", e => {
       touchEndX = e.changedTouches[0].screenX;
       let delta = touchEndX - touchStartX;
       if (Math.abs(delta) > 50) {
         blockTap = true;
         setTimeout(() => blockTap = false, 400);
-        if (delta > 0) {
-          ec.prev();
-        } else {
-          ec.next();
-        }
+        if (delta > 0) ec.prev();
+        else ec.next();
         updateTitle();
       }
     });
@@ -163,6 +194,22 @@
       if (e.target.dataset.view) {
         ec.setOption("view", e.target.dataset.view);
         updateActiveMode(e.target.dataset.view);
+        updateTitle();
+      }
+    });
+
+    document.getElementById("dayFooter").addEventListener("click", (e) => {
+      if (e.target.tagName === "SPAN") {
+        const offset = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].indexOf(e.target.textContent);
+        const baseDate = new Date(ec.getOption("date"));
+        const currentWeekday = (baseDate.getDay() + 6) % 7; // 0=Mon
+        const diff = offset - currentWeekday;
+        baseDate.setDate(baseDate.getDate() + diff);
+        const iso = baseDate.toISOString().slice(0, 10);
+        ec.setOption("date", iso);
+        ec.setOption("view", "resourceTimeGridDay");
+        updateActiveMode("resourceTimeGridDay");
+        updateTitle();
       }
     });
 
@@ -170,56 +217,69 @@
       document.querySelectorAll("#modeSwitcher span").forEach(el => {
         el.classList.toggle("active", el.dataset.view === viewName);
       });
+      document.getElementById("dayFooter").style.display = viewName === "resourceTimeGridDay" ? "flex" : "none";
     }
 
     function updateTitle() {
-      const date = ec.getOption("date");
-      const title = new Date(date);
-      const month = title.toLocaleString('default', { month: 'long' });
-      const year = title.getFullYear();
-      document.getElementById("calendarTitle").textContent = `${month} ${year}`;
+      const dateStr = ec.getOption("date");
+      const date = new Date(dateStr);
+      const view = ec.getOption("view");
+
+      const month = date.toLocaleString('default', { month: 'long' });
+      const year = date.getFullYear();
+      const dow = date.toLocaleString('default', { weekday: 'long' });
+      const day = date.getDate();
+
+      if (view === "resourceTimeGridDay") {
+        document.getElementById("calendarTitle").textContent = `${dow}, ${day} ${month}`;
+        document.getElementById("calendarSubtitle").textContent = `Week ${getWeekNumber(date)}`;
+        updateDayFooter(date);
+      } else {
+        document.getElementById("calendarTitle").textContent = `${month} ${year}`;
+        document.getElementById("calendarSubtitle").textContent = ``;
+      }
+    }
+
+    function updateDayFooter(date) {
+      const dayIndex = date.getDay(); // 0=Sun ... 6=Sat
+      const ordered = [1, 2, 3, 4, 5, 6, 0]; // Mon–Sun
+      document.querySelectorAll("#dayFooter span").forEach((el, i) => {
+        el.classList.toggle("active", ordered[i] === dayIndex);
+      });
+    }
+
+    function getWeekNumber(d) {
+      d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+      d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+      const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+      return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
     }
 
     function createEvents() {
-      let days = [];
-      for (let i = 0; i < 7; ++i) {
-        let day = new Date();
-        let diff = i - day.getDay();
-        day.setDate(day.getDate() + diff);
-        days[i] = day.getFullYear() + "-" + _pad(day.getMonth() + 1) + "-" + _pad(day.getDate());
-      }
-
+      const today = new Date().toISOString().slice(0, 10);
       return [
-        { start: days[0] + " 00:00", end: days[0] + " 09:00", resourceId: 1, display: "background" },
-        { start: days[1] + " 12:00", end: days[1] + " 14:00", resourceId: 2, display: "background" },
-        { start: days[2] + " 17:00", end: days[2] + " 24:00", resourceId: 1, display: "background" },
         {
-          start: days[0] + " 10:00",
-          end: days[0] + " 14:00",
+          start: today + "T08:39:00",
+          end: today + "T10:39:00",
+          title: "Наращивание: Full Colour Short",
           resourceId: 1,
-          title: "Background and regular events",
-          color: "#FE6B64",
+          color: "#2e8b57",
         },
         {
-          start: days[1] + " 16:00",
-          end: days[2] + " 08:00",
+          start: today + "T08:39:00",
+          end: today + "T10:39:00",
+          title: "Full Colour Short: Leonid Zadoroznyj",
           resourceId: 2,
-          title: "Multi-day event",
-          color: "#B29DD9",
+          color: "#4682b4",
         },
         {
-          start: days[2] + " 09:00",
-          end: days[2] + " 13:00",
+          start: today,
+          title: "💵 Зарплата",
+          allDay: true,
           resourceId: 2,
-          title: "Assigned to resource",
-          color: "#779ECB",
-        },
+          color: "#8888ff"
+        }
       ];
-    }
-
-    function _pad(num) {
-      let norm = Math.floor(Math.abs(num));
-      return (norm < 10 ? "0" : "") + norm;
     }
 
     updateTitle();
