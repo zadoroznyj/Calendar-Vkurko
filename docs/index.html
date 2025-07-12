@@ -1,44 +1,237 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Google Identity Services Auth Test</title>
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>EventCalendar</title>
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png" />
+    <link rel="manifest" href="site.webmanifest" />
+    <link rel="stylesheet" href="global.css?20231021" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@event-calendar/build@4.5.0/dist/event-calendar.min.css" />
+    <script src="https://cdn.jsdelivr.net/npm/@event-calendar/build@4.5.0/dist/event-calendar.min.js"></script>
+    <script src="https://hammerjs.github.io/dist/hammer.min.js"></script>
+    <style>
+        .ec-timeline .ec-time,
+        .ec-timeline .ec-line {
+            width: 16px;
+        }
+        .ec-timeline .ec-time {
+            overflow: visible;
+        }
+        .ec-timeline .ec-time time {
+            display: inline-block;
+            width: 64px;
+            text-align: center;
+        }
+    </style>
+    <!-- Подключаем новую Google Identity Services -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-  <h1>Тест новой авторизации Google Identity Services</h1>
+<header class="row">
+    <button class="toggle-dark-button" title="Toggle dark mode" onclick="document.body.classList.toggle('ec-dark')">
+        <svg class="light" focusable="false" viewBox="0 0 32 32"><path d="M16 12.005a4 4 0 1 1-4 4a4.005 4.005 0 0 1 4-4m0-2a6 6 0 1 0 6 6a6 6 0 0 0-6-6z" fill="currentColor"></path><path d="M5.394 6.813l1.414-1.415l3.506 3.506L8.9 10.318z" fill="currentColor"></path><path d="M2 15.005h5v2H2z" fill="currentColor"></path><path d="M5.394 25.197L8.9 21.691l1.414 1.415l-3.506 3.505z" fill="currentColor"></path><path d="M15 25.005h2v5h-2z" fill="currentColor"></path><path d="M21.687 23.106l1.414-1.415l3.506 3.506l-1.414 1.414z" fill="currentColor"></path><path d="M25 15.005h5v2h-5z" fill="currentColor"></path><path d="M21.687 8.904l3.506-3.506l1.414 1.415l-3.506 3.505z" fill="currentColor"></path><path d="M15 2.005h2v5h-2z" fill="currentColor"></path></svg>
+        <svg class="dark" focusable="false" viewBox="0 0 32 32"><path d="M13.502 5.414a15.075 15.075 0 0 0 11.594 18.194a11.113 11.113 0 0 1-7.975 3.39c-.138 0-.278.005-.418 0a11.094 11.094 0 0 1-3.2-21.584M14.98 3a1.002 1.002 0 0 0-.175.016a13.096 13.096 0 0 0 1.825 25.981c.164.006.328 0 .49 0a13.072 13.072 0 0 0 10.703-5.555a1.01 1.01 0 0 0-.783-1.565A13.08 13.08 0 0 1 15.89 4.38A1.015 1.015 0 0 0 14.98 3z" fill="currentColor"></path></svg>
+    </button>
+</header>
+<main class="row">
+    <div id="ec" class="col"></div>
+</main>
 
-  <div id="g_id_onload"
-       data-client_id="104760002655-tftfu479sjog0u3qj9oa145a8qo7a9t2.apps.googleusercontent.com"
-       data-callback="handleCredentialResponse"
-       data-auto_select="false"
-       data-login_uri="">
-  </div>
+<script>
+    let touchStartX = 0;
+    let touchEndX = 0;
+    let blockTap = false;
+    let lastClickedDate = null;
+    let lastTapTime = 0;
 
-  <div class="g_id_signin" data-type="standard"></div>
+    document.addEventListener("touchstart", function (e) {
+        touchStartX = e.changedTouches[0].screenX;
+    });
 
-  <pre id="output"></pre>
+    document.addEventListener("touchend", function (e) {
+        touchEndX = e.changedTouches[0].screenX;
+        let delta = touchEndX - touchStartX;
+        if (Math.abs(delta) > 50) {
+            blockTap = true;
+            setTimeout(() => (blockTap = false), 400);
+            if (delta > 0) {
+                ec.prev();
+            } else {
+                ec.next();
+            }
+        }
+    });
 
-  <script>
-    function handleCredentialResponse(response) {
-      const out = document.getElementById("output");
-      out.textContent = "JWT Credential: " + response.credential;
+    // Календарь EventCalendar (пока без событий)
+    const ec = EventCalendar.create(document.getElementById("ec"), {
+        view: "dayGridMonth",
+        firstDay: 1,
+        headerToolbar: {
+            start: "prev,next today",
+            center: "title",
+            end: "dayGridMonth,timeGridWeek,timeGridDay,listWeek resourceTimeGridWeek,resourceTimelineWeek",
+        },
+        resources: [
+            { id: 1, title: "Наталья" },
+            { id: 2, title: "Ирина" },
+        ],
+        scrollTime: "09:00:00",
+        events: [],  // Пусто — позже загрузим события из Google
+        views: {
+            timeGridWeek: {
+                pointer: true,
+                slotLabelFormat: { hour: '2-digit', minute: '2-digit', hour12: false },
+                eventTimeFormat: { hour: '2-digit', minute: '2-digit', hour12: false }
+            },
+            resourceTimeGridWeek: {
+                pointer: true,
+                slotLabelFormat: { hour: '2-digit', minute: '2-digit', hour12: false },
+                eventTimeFormat: { hour: '2-digit', minute: '2-digit', hour12: false }
+            },
+            resourceTimelineWeek: {
+                slotDuration: "00:15",
+                slotLabelInterval: "01:00",
+                slotMinTime: "09:00",
+                slotMaxTime: "21:00",
+                slotWidth: 16,
+                slotLabelFormat: { hour: '2-digit', minute: '2-digit', hour12: false },
+                eventTimeFormat: { hour: '2-digit', minute: '2-digit', hour12: false }
+            },
+            timeGridDay: {
+                pointer: true,
+                slotLabelFormat: { hour: '2-digit', minute: '2-digit', hour12: false },
+                eventTimeFormat: { hour: '2-digit', minute: '2-digit', hour12: false }
+            },
+            resourceTimeGridDay: {
+                pointer: true,
+                slotLabelFormat: { hour: '2-digit', minute: '2-digit', hour12: false },
+                eventTimeFormat: { hour: '2-digit', minute: '2-digit', hour12: false }
+            },
+        },
+        dayMaxEvents: true,
+        nowIndicator: true,
+        selectable: true,
+        dateClick: function (info) {
+            lastClickedDate = info.dateStr;
+            lastTapTime = Date.now();
+        },
+    });
 
-      // Распарсим JWT токен, чтобы получить инфо о пользователе
-      const payload = parseJwt(response.credential);
-      out.textContent += "\n\nUser Info:\n" + JSON.stringify(payload, null, 2);
-      console.log(payload);
+    // Свайп для навигации
+    const calendarEl = document.getElementById("ec");
+    const hammer = new Hammer(calendarEl);
+    hammer.get("doubletap").set({ interval: 300 });
+    hammer.on("doubletap", function () {
+        if (lastClickedDate && Date.now() - lastTapTime < 600) {
+            ec.setOption("date", lastClickedDate);
+            ec.setOption("view", "resourceTimeGridDay");
+        }
+    });
+
+    // === Google API (новая авторизация через Google Identity Services) ===
+
+    const CLIENT_ID = "104760002655-tftfu479sjog0u3qj9oa145a8qo7a9t2.apps.googleusercontent.com";
+    const API_KEY = "AIzaSyDNHKvmGafvKU2P9yN-IXNjx6SbrpxEtIQ";
+    const DISCOVERY_DOCS = ["https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest"];
+    const SCOPES = "https://www.googleapis.com/auth/calendar.readonly";
+
+    let tokenClient;
+    let gapiInited = false;
+    let gisInited = false;
+
+    function gapiLoaded() {
+        gapi.load('client', initializeGapiClient);
     }
 
-    function parseJwt(token) {
-      let base64Url = token.split('.')[1];
-      let base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-      let jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
-          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-      }).join(''));
-
-      return JSON.parse(jsonPayload);
+    async function initializeGapiClient() {
+        await gapi.client.init({
+            apiKey: API_KEY,
+            discoveryDocs: DISCOVERY_DOCS,
+        });
+        gapiInited = true;
+        maybeEnableButtons();
     }
-  </script>
+
+    function gisLoaded() {
+        tokenClient = google.accounts.oauth2.initTokenClient({
+            client_id: CLIENT_ID,
+            scope: SCOPES,
+            callback: '', // будет установлен позже
+        });
+        gisInited = true;
+        maybeEnableButtons();
+    }
+
+    function maybeEnableButtons() {
+        if (gapiInited && gisInited) {
+            // Авто-запуск авторизации и загрузки событий
+            requestAccessToken();
+        }
+    }
+
+    function requestAccessToken() {
+        tokenClient.callback = async (resp) => {
+            if (resp.error !== undefined) {
+                console.error('Ошибка авторизации:', resp.error);
+                return;
+            }
+            await loadCalendarEvents();
+        };
+
+        // Запросим токен
+        tokenClient.requestAccessToken();
+    }
+
+    async function loadCalendarEvents() {
+        const response = await gapi.client.calendar.events.list({
+            calendarId: 'primary',
+            timeMin: (new Date()).toISOString(),
+            showDeleted: false,
+            singleEvents: true,
+            maxResults: 100,
+            orderBy: 'startTime'
+        });
+
+        const events = response.result.items;
+        if (!events || events.length === 0) {
+            console.log('No upcoming events found.');
+            return;
+        }
+        const ecEvents = events.map(ev => {
+            let start = ev.start.dateTime || ev.start.date; // all-day или с временем
+            let end = ev.end.dateTime || ev.end.date;
+
+            // Формат EventCalendar требует "YYYY-MM-DD HH:mm" с пробелом
+            start = start.replace("T", " ").substring(0, 16);
+            end = end.replace("T", " ").substring(0, 16);
+
+            return {
+                id: ev.id,
+                title: ev.summary || "Без названия",
+                start: start,
+                end: end,
+                allDay: !!ev.start.date,
+                color: "#4285F4",
+            };
+        });
+
+        ec.setOption("events", ecEvents);
+    }
+
+    // Загружаем gapi и gis
+    function handleClientLoad() {
+        gapiLoaded();
+        gisLoaded();
+    }
+
+    // Запускаем
+    window.onload = handleClientLoad;
+</script>
+<script src="https://apis.google.com/js/api.js" onload="gapiLoaded()" async defer></script>
+<script src="https://accounts.google.com/gsi/client" async defer onload="gisLoaded()"></script>
+
 </body>
 </html>
