@@ -49,19 +49,29 @@
     }
     .month-footer {
       display: flex;
-      justify-content: space-around;
+      justify-content: flex-start;
+      gap: 8px;
       font-size: 15px;
-      padding: 8px 0;
+      padding: 8px;
+      overflow-x: auto;
+      scroll-snap-type: x mandatory;
     }
     .month-footer span {
       color: #666;
       cursor: pointer;
-      padding: 4px 8px;
-      border-radius: 12px;
+      padding: 4px 12px;
+      border-radius: 16px;
+      scroll-snap-align: center;
+      white-space: nowrap;
+      flex-shrink: 0;
     }
-    .month-footer .active {
-      background: #111;
+    .month-footer span.active {
+      background: #000;
       color: #fff;
+    }
+    .month-footer span.current-month {
+      color: #005aff;
+      font-weight: 600;
     }
     #ec {
       width: 100%;
@@ -127,190 +137,213 @@
   </main>
 
   <footer>
-    <div class="month-footer" id="monthFooter">
-      <span>Apr</span><span>May</span><span>Jun</span><span class="active">Jul</span><span>Aug</span><span>Sep</span><span>Oct</span>
-    </div>
+    <div class="month-footer" id="monthFooter"></div>
     <div class="day-footer" id="dayFooter" style="display: none;"></div>
   </footer>
 
-  <script>
-    let touchStartX = 0;
-    let touchEndX = 0;
-    let lastClickedDate = null;
-    let lastTapTime = 0;
+<script>
+  let touchStartX = 0;
+  let touchEndX = 0;
+  let lastClickedDate = null;
+  let lastTapTime = 0;
 
-    const ec = EventCalendar.create(document.getElementById("ec"), {
-      view: "dayGridMonth",
-      firstDay: 1,
-      timeFormat: 'HH:mm',
-      headerToolbar: false,
-      height: "100%",
-      date: new Date().toISOString().slice(0, 10),
-      resources: [
-        { id: 1, title: "Наталья" },
-        { id: 2, title: "Ирина" },
-      ],
-      events: createEvents(),
-      nowIndicator: true,
-      selectable: true,
-      dayMaxEvents: true,
-      scrollTime: "08:00:00",
-      slotMinTime: "00:00:00",
-      slotMaxTime: "24:00:00",
-      slotLabelFormat: {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false
-      }
+  const ec = EventCalendar.create(document.getElementById("ec"), {
+    view: "dayGridMonth",
+    firstDay: 1,
+    timeFormat: 'HH:mm',
+    headerToolbar: false,
+    height: "100%",
+    date: new Date().toISOString().slice(0, 10),
+    resources: [
+      { id: 1, title: "Наталья" },
+      { id: 2, title: "Ирина" },
+    ],
+    events: createEvents(),
+    nowIndicator: true,
+    selectable: true,
+    dayMaxEvents: true,
+    scrollTime: "08:00:00",
+    slotMinTime: "06:00:00",
+    slotMaxTime: "22:00:00",
+    slotLabelFormat: {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    }
+  });
+
+  const calendarEl = document.getElementById("ec");
+  const hammer = new Hammer(calendarEl);
+  hammer.get("doubletap").set({ interval: 300 });
+
+  hammer.on("doubletap", function () {
+    if (lastClickedDate && Date.now() - lastTapTime < 600) {
+      ec.setOption("date", lastClickedDate);
+      ec.setOption("view", "resourceTimeGridDay");
+      updateActiveMode("resourceTimeGridDay");
+      updateTitle();
+    }
+  });
+
+  document.addEventListener("touchstart", e => {
+    touchStartX = e.changedTouches[0].screenX;
+  });
+
+  document.addEventListener("touchend", e => {
+    touchEndX = e.changedTouches[0].screenX;
+    let delta = touchEndX - touchStartX;
+    if (Math.abs(delta) > 50) {
+      if (delta > 0) ec.prev();
+      else ec.next();
+      updateTitle();
+    }
+  });
+
+  document.getElementById("modeSwitcher").addEventListener("click", (e) => {
+    if (e.target.dataset.view) {
+      const currentDate = ec.getOption("date");
+      ec.setOption("date", currentDate);
+      ec.setOption("view", e.target.dataset.view);
+      updateActiveMode(e.target.dataset.view);
+      updateTitle();
+    }
+  });
+
+  document.getElementById("dayFooter").addEventListener("click", (e) => {
+    const item = e.target.closest('.day-item');
+    if (item && item.dataset.date) {
+      ec.setOption("date", item.dataset.date);
+      ec.setOption("view", "resourceTimeGridDay");
+      updateActiveMode("resourceTimeGridDay");
+      updateTitle();
+    }
+  });
+
+  ec.setOption("dateClick", function(info) {
+    lastClickedDate = info.dateStr;
+    lastTapTime = Date.now();
+  });
+
+  function updateActiveMode(viewName) {
+    document.querySelectorAll("#modeSwitcher span").forEach(el => {
+      el.classList.toggle("active", el.dataset.view === viewName);
     });
+    document.getElementById("dayFooter").style.display = viewName === "resourceTimeGridDay" ? "flex" : "none";
+    document.getElementById("monthFooter").style.display = viewName === "resourceTimeGridDay" ? "none" : "flex";
+  }
 
-    const calendarEl = document.getElementById("ec");
-    const hammer = new Hammer(calendarEl);
-    hammer.get("doubletap").set({ interval: 300 });
+  function updateTitle() {
+    const dateStr = ec.getOption("date");
+    const date = new Date(dateStr);
+    const view = ec.getOption("view");
 
-    hammer.on("doubletap", function () {
-      if (lastClickedDate && Date.now() - lastTapTime < 600) {
-        ec.setOption("date", lastClickedDate);
-        ec.setOption("view", "resourceTimeGridDay");
-        updateActiveMode("resourceTimeGridDay");
+    const day = date.getDate();
+    const dow = date.toLocaleString('default', { weekday: 'long' });
+    const monthShort = date.toLocaleString('default', { month: 'short' });
+
+    if (view === "resourceTimeGridDay") {
+      document.getElementById("calendarTitle").textContent = `${dow}, ${day} ${monthShort}`;
+      document.getElementById("calendarSubtitle").textContent = `Week ${getWeekNumber(date)}`;
+      updateDayFooterWithDates(date);
+    } else {
+      const month = date.toLocaleString('default', { month: 'long' });
+      const year = date.getFullYear();
+      document.getElementById("calendarTitle").textContent = `${month} ${year}`;
+      document.getElementById("calendarSubtitle").textContent = ``;
+    }
+
+    updateMonthFooter(date);
+  }
+
+  function updateMonthFooter(currentDate) {
+    const footer = document.getElementById("monthFooter");
+    const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    const today = new Date();
+
+    footer.innerHTML = "";
+    months.forEach((month, i) => {
+      const span = document.createElement("span");
+      span.textContent = month;
+      span.dataset.month = i;
+      span.classList.toggle("active", i === currentDate.getMonth());
+      span.classList.toggle("current-month", i === today.getMonth());
+      span.addEventListener("click", () => {
+        const newDate = new Date(currentDate.getFullYear(), i, 1);
+        ec.setOption("date", newDate.toISOString().slice(0, 10));
+        ec.setOption("view", "dayGridMonth");
         updateTitle();
-      }
-    });
-
-    document.addEventListener("touchstart", e => {
-      touchStartX = e.changedTouches[0].screenX;
-    });
-
-    document.addEventListener("touchend", e => {
-      touchEndX = e.changedTouches[0].screenX;
-      let delta = touchEndX - touchStartX;
-      if (Math.abs(delta) > 50) {
-        if (delta > 0) ec.prev();
-        else ec.next();
-        updateTitle();
-      }
-    });
-
-    document.getElementById("modeSwitcher").addEventListener("click", (e) => {
-      if (e.target.dataset.view) {
-        const currentDate = ec.getOption("date");
-        ec.setOption("date", currentDate);
-        ec.setOption("view", e.target.dataset.view);
-        updateActiveMode(e.target.dataset.view);
-        updateTitle();
-      }
-    });
-
-    document.getElementById("dayFooter").addEventListener("click", (e) => {
-      const item = e.target.closest('.day-item');
-      if (item && item.dataset.date) {
-        ec.setOption("date", item.dataset.date);
-        ec.setOption("view", "resourceTimeGridDay");
-        updateActiveMode("resourceTimeGridDay");
-        updateTitle();
-      }
-    });
-
-    ec.setOption("dateClick", function(info) {
-      lastClickedDate = info.dateStr;
-      lastTapTime = Date.now();
-    });
-
-    function updateActiveMode(viewName) {
-      document.querySelectorAll("#modeSwitcher span").forEach(el => {
-        el.classList.toggle("active", el.dataset.view === viewName);
+        span.scrollIntoView({ inline: "center", behavior: "smooth" });
       });
-      document.getElementById("dayFooter").style.display = viewName === "resourceTimeGridDay" ? "flex" : "none";
-      document.getElementById("monthFooter").style.display = viewName === "resourceTimeGridDay" ? "none" : "flex";
+      footer.appendChild(span);
+    });
+  }
+
+  function updateDayFooterWithDates(date) {
+    const footer = document.getElementById("dayFooter");
+    footer.innerHTML = "";
+
+    const startOfWeek = new Date(date);
+    startOfWeek.setDate(date.getDate() - ((date.getDay() + 6) % 7)); // Monday
+
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(startOfWeek);
+      d.setDate(d.getDate() + i);
+      const iso = d.toISOString().slice(0, 10);
+
+      const dow = d.toLocaleString('default', { weekday: 'short' });
+      const day = d.getDate();
+      const isActive = d.toDateString() === date.toDateString();
+      const month = d.toLocaleString('default', { month: 'short' });
+
+      const div = document.createElement("div");
+      div.className = "day-item" + (isActive ? " active" : "");
+      div.dataset.date = iso;
+      div.innerHTML = `
+        <div class="circle">
+          <div class="day-name">${dow}</div>
+          <div class="day-number">${day}</div>
+          ${isActive ? `<div class="day-month">${month}</div>` : ""}
+        </div>
+      `;
+      footer.appendChild(div);
     }
+  }
 
-    function updateTitle() {
-      const dateStr = ec.getOption("date");
-      const date = new Date(dateStr);
-      const view = ec.getOption("view");
+  function getWeekNumber(d) {
+    d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+  }
 
-      const day = date.getDate();
-      const dow = date.toLocaleString('default', { weekday: 'long' });
-      const monthShort = date.toLocaleString('default', { month: 'short' });
-
-      if (view === "resourceTimeGridDay") {
-        document.getElementById("calendarTitle").textContent = `${dow}, ${day} ${monthShort}`;
-        document.getElementById("calendarSubtitle").textContent = `Week ${getWeekNumber(date)}`;
-        updateDayFooterWithDates(date);
-      } else {
-        const month = date.toLocaleString('default', { month: 'long' });
-        const year = date.getFullYear();
-        document.getElementById("calendarTitle").textContent = `${month} ${year}`;
-        document.getElementById("calendarSubtitle").textContent = ``;
+  function createEvents() {
+    const today = new Date().toISOString().slice(0, 10);
+    return [
+      {
+        start: today + "T08:39:00",
+        end: today + "T10:39:00",
+        title: "Наращивание: Full Colour Short",
+        resourceId: 1,
+        color: "#2e8b57",
+      },
+      {
+        start: today + "T08:39:00",
+        end: today + "T10:39:00",
+        title: "Full Colour Short: Leonid Zadoroznyj",
+        resourceId: 2,
+        color: "#4682b4",
+      },
+      {
+        start: today,
+        title: "💵 Зарплата",
+        allDay: true,
+        resourceId: 2,
+        color: "#8888ff"
       }
-    }
+    ];
+  }
 
-    function updateDayFooterWithDates(date) {
-      const footer = document.getElementById("dayFooter");
-      footer.innerHTML = "";
-
-      const startOfWeek = new Date(date);
-      startOfWeek.setDate(date.getDate() - ((date.getDay() + 6) % 7)); // Monday
-
-      for (let i = 0; i < 7; i++) {
-        const d = new Date(startOfWeek);
-        d.setDate(d.getDate() + i);
-        const iso = d.toISOString().slice(0, 10);
-
-        const dow = d.toLocaleString('default', { weekday: 'short' });
-        const day = d.getDate();
-        const isActive = d.toDateString() === date.toDateString();
-        const month = d.toLocaleString('default', { month: 'short' });
-
-        const div = document.createElement("div");
-        div.className = "day-item" + (isActive ? " active" : "");
-        div.dataset.date = iso;
-        div.innerHTML = `
-          <div class="circle">
-            <div class="day-name">${dow}</div>
-            <div class="day-number">${day}</div>
-            ${isActive ? `<div class="day-month">${month}</div>` : ""}
-          </div>
-        `;
-        footer.appendChild(div);
-      }
-    }
-
-    function getWeekNumber(d) {
-      d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
-      d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
-      const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-      return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
-    }
-
-    function createEvents() {
-      const today = new Date().toISOString().slice(0, 10);
-      return [
-        {
-          start: today + "T08:39:00",
-          end: today + "T10:39:00",
-          title: "Наращивание: Full Colour Short",
-          resourceId: 1,
-          color: "#2e8b57",
-        },
-        {
-          start: today + "T08:39:00",
-          end: today + "T10:39:00",
-          title: "Full Colour Short: Leonid Zadoroznyj",
-          resourceId: 2,
-          color: "#4682b4",
-        },
-        {
-          start: today,
-          title: "💵 Зарплата",
-          allDay: true,
-          resourceId: 2,
-          color: "#8888ff"
-        }
-      ];
-    }
-
-    updateTitle();
-  </script>
+  updateTitle();
+</script>
 </body>
 </html>
