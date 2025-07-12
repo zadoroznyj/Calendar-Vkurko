@@ -98,6 +98,7 @@
 
     hammer.on("doubletap", function (ev) {
         let el = ev.target;
+        // Идём вверх по DOM в поисках data-date
         while (el && !el.hasAttribute("data-date")) {
             el = el.parentElement;
         }
@@ -112,7 +113,7 @@
         }
         alert("Двойной тап на дате: " + dateStr);
 
-        // Когда проверишь — раскомментируй следующий код для перехода:
+        // Когда проверишь — раскомментируй для перехода:
         // ec.setOption("date", dateStr);
         // ec.setOption("view", "resourceTimeGridDay");
     });
