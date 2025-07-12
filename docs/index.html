@@ -49,21 +49,15 @@
     }
     .month-footer {
       display: flex;
-      justify-content: flex-start;
-      gap: 8px;
+      justify-content: space-around;
       font-size: 15px;
       padding: 8px;
-      overflow-x: auto;
-      scroll-snap-type: x mandatory;
     }
     .month-footer span {
       color: #666;
       cursor: pointer;
       padding: 4px 12px;
       border-radius: 16px;
-      scroll-snap-align: center;
-      white-space: nowrap;
-      flex-shrink: 0;
     }
     .month-footer span.active {
       background: #000;
@@ -259,23 +253,34 @@
     const footer = document.getElementById("monthFooter");
     const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
     const today = new Date();
+    const currentMonthIndex = currentDate.getMonth();
 
     footer.innerHTML = "";
-    months.forEach((month, i) => {
+
+    for (let i = -2; i <= 2; i++) {
+      const index = (currentMonthIndex + i + 12) % 12;
       const span = document.createElement("span");
-      span.textContent = month;
-      span.dataset.month = i;
-      span.classList.toggle("active", i === currentDate.getMonth());
-      span.classList.toggle("current-month", i === today.getMonth());
+      span.textContent = months[index];
+      span.dataset.month = index;
+      span.classList.toggle("active", index === currentMonthIndex);
+
+      const isTodayMonth = index === today.getMonth();
+      const isVisibleRange = Math.abs(i) <= 2;
+      const isSelected = index === currentMonthIndex;
+
+      if (isTodayMonth && !isSelected && isVisibleRange) {
+        span.classList.add("current-month");
+      }
+
       span.addEventListener("click", () => {
-        const newDate = new Date(currentDate.getFullYear(), i, 1);
+        const newDate = new Date(currentDate.getFullYear(), index, 1);
         ec.setOption("date", newDate.toISOString().slice(0, 10));
         ec.setOption("view", "dayGridMonth");
         updateTitle();
-        span.scrollIntoView({ inline: "center", behavior: "smooth" });
       });
+
       footer.appendChild(span);
-    });
+    }
   }
 
   function updateDayFooterWithDates(date) {
