@@ -100,15 +100,13 @@
     hammer.get("doubletap").set({ interval: 300 });
 
     hammer.on("doubletap", function (ev) {
-        // Получаем дату из события, если нужно — иначе логика простая — переключаем на day view сегодняшнего или ранее выбранного дня
-        const target = ev.target.closest("[data-date]");
-        let dateStr = target ? target.getAttribute("data-date") : null;
-
-        // Если дата не найдена, можно попробовать взять текущую дату календаря
-        if (!dateStr) {
-            dateStr = ec.getOption("date");
+        let el = ev.target;
+        while (el && !el.hasAttribute("data-date")) {
+            el = el.parentElement;
         }
+        if (!el) return;
 
+        const dateStr = el.getAttribute("data-date");
         if (dateStr) {
             ec.setOption("date", dateStr);
             ec.setOption("view", "resourceTimeGridDay");
