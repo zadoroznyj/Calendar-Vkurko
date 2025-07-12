@@ -87,14 +87,11 @@
         dayMaxEvents: true,
         nowIndicator: true,
         selectable: true,
-
-        // УБИРАЕМ ОБРАБОТЧИК ОДИНОЧНОГО ТАПА полностью или заменяем на пустую функцию:
         dateClick: function (info) {
-            // ничего не делаем при одиночном тапе
+            // отключаем одиночный тап
         },
     });
 
-    // Используем Hammer.js только для двойного тапа:
     const calendarEl = document.getElementById("ec");
     const hammer = new Hammer(calendarEl);
     hammer.get("doubletap").set({ interval: 300 });
@@ -104,13 +101,20 @@
         while (el && !el.hasAttribute("data-date")) {
             el = el.parentElement;
         }
-        if (!el) return;
-
-        const dateStr = el.getAttribute("data-date");
-        if (dateStr) {
-            ec.setOption("date", dateStr);
-            ec.setOption("view", "resourceTimeGridDay");
+        if (!el) {
+            alert("Дата не найдена (нет data-date)");
+            return;
         }
+        const dateStr = el.getAttribute("data-date");
+        if (!dateStr) {
+            alert("Дата не найдена (атрибут пуст)");
+            return;
+        }
+        alert("Двойной тап на дате: " + dateStr);
+
+        // Когда проверишь — раскомментируй следующий код для перехода:
+        // ec.setOption("date", dateStr);
+        // ec.setOption("view", "resourceTimeGridDay");
     });
 
     function createEvents() {
