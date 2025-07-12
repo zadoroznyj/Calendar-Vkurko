@@ -30,6 +30,8 @@
             background-color: #f5f5f5;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             color: #333;
+            margin: 0;
+            padding: 0;
         }
         body.ec-dark {
             background-color: #1a1a1a;
@@ -39,7 +41,8 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            padding: 10px;
+            padding: 0;
+            width: 100%;
         }
         header {
             background-color: #000;
@@ -52,6 +55,7 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            font-size: 14px;
         }
         header button {
             background: none;
@@ -62,11 +66,15 @@
         main {
             margin-top: 60px;
             width: 100%;
+            max-width: 100%;
+            overflow-x: hidden;
         }
         #ec {
             background-color: #fff;
-            border-radius: 10px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            border-radius: 0;
+            box-shadow: none;
+            width: 100%;
+            max-width: 100%;
             overflow: hidden;
         }
         .ec-day-grid .ec-day {
@@ -75,6 +83,8 @@
         .ec-day-grid .ec-day-header {
             background-color: #f0f0f0;
             font-weight: bold;
+            padding: 5px;
+            text-align: center;
         }
         .ec-event {
             background-color: #007aff;
@@ -102,17 +112,39 @@
             background-color: #fff;
             padding: 10px;
             border-bottom: 1px solid #ddd;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .ec-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #000;
+        }
+        .ec-button-group {
+            display: flex;
+            gap: 5px;
         }
         .ec-button-group button {
             background-color: #f0f0f0;
             border: 1px solid #ddd;
             border-radius: 4px;
             padding: 5px 10px;
-            margin: 0 5px;
+            margin: 0;
+            font-size: 14px;
+            color: #333;
         }
         .ec-button-group button.active {
             background-color: #007aff;
             color: #fff;
+            border-color: #007aff;
+        }
+        .ec-prev-button, .ec-next-button, .ec-today-button {
+            background: none;
+            border: none;
+            font-size: 18px;
+            color: #007aff;
+            cursor: pointer;
         }
     </style>
 </head>
@@ -121,7 +153,7 @@
     <button class="toggle-dark-button" title="Toggle dark mode" onclick="document.body.classList.toggle('ec-dark')">
         🌙
     </button>
-    <div>11:45 AM EEST</div>
+    <div>11:52 AM EEST</div>
 </header>
 <main class="row">
     <div id="ec" class="col"></div>
@@ -246,7 +278,7 @@
                 end: days[3] + " 18:00",
                 resourceId: 1,
                 title: "Overlapping events are positioned properly",
-                color: "#779ECB",
+                color: #779ECB",
             },
             {
                 start: days[5] + " 10:00",
