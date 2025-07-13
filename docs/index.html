@@ -359,22 +359,25 @@
 
 function doGet() {
   const ss = SpreadsheetApp.openById("1gW4ZD30gfiZqzT8e2ZATtfFljxHr2tiyMS6l_HEwFEs");
-  const sheet = ss.getSheetByName("Sheet"); // Имя листа, где данные
+  const sheet = ss.getSheetByName("Sheet"); // Имя листа с данными
   const data = sheet.getDataRange().getValues();
 
   const events = [];
 
-  for (let i = 1; i < data.length; i++) {
+  // data[i] - строка i
+  // data[i][j] - столбец j в строке i
+
+  for (let i = 1; i < data.length; i++) {  // пропускаем заголовок i=0
     const row = data[i];
-    if (!row[2]) continue; // Если нет Start (индекс 2), пропускаем
+    if (!row[2]) continue; // если нет Start, пропускаем
 
     events.push({
-      title: row[1] || "Без названия",          // Title (index 1)
-      start: row[2],                            // Start (index 2)
-      end: row[3] || row[2],                    // End (index 3) или Start если нет
-      resourceId: row[4] || 1,                   // resourceid (index 4)
-      color: row[5] || "#3788d8",                // colour (index 5)
-      allDay: row[9] === true || row[9] === "TRUE" // allDay (index 9), true или строка "TRUE"
+      title: row[1] || "Без названия",                // Title - 2-й столбец
+      start: row[2],                                  // Start - 3-й столбец
+      end: row[3] || row[2],                          // End - 4-й столбец
+      resourceId: row[4] || 1,                        // resourceid - 5-й столбец
+      color: row[5] || "#3788d8",                     // colour - 6-й столбец
+      allDay: row[9] === true || row[9] === "TRUE"   // allDay - 10-й столбец
     });
   }
 
