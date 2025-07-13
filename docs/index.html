@@ -348,3 +348,36 @@
 </script>
 </body>
 </html>
+
+function doGet() {
+  const ss = SpreadsheetApp.openById("1gW4ZD30gfiZqzT8e2ZATtfFljxHr2tiyMS6l_HEwFEs");
+  const sheet = ss.getSheetByName("Sheet"); // имя листа
+  const data = sheet.getDataRange().getValues();
+
+  const events = [];
+
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    if (!row[2]) continue;
+
+    // Получаем числовой resourceId: master1 → 1, master2 → 2
+    let resourceId = 1;
+    if (typeof row[4] === 'string') {
+      if (row[4].toLowerCase().includes('master2')) resourceId = 2;
+    } else if (row[4] === 2) {
+      resourceId = 2;
+    }
+
+    events.push({
+      title: row[1] || "Без названия",
+      start: row[2],
+      end: row[3] || row[2],
+      resourceId: resourceId,
+      color: row[5] || "#3788d8",
+      allDay: row[9] === true || row[9] === "TRUE"
+    });
+  }
+
+  return ContentService.createTextOutput(JSON.stringify(events))
+    .setMimeType(ContentService.MimeType.JSON);
+}
