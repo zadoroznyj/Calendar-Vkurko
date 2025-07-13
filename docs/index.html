@@ -171,11 +171,11 @@
   // Функция загрузки событий с твоего Google Apps Script
   async function loadEvents() {
     try {
-      const response = await fetch('https://script.google.com/macros/s/AKfycbxYpNn6SikehbE3qfkyrSatFNeoRe7-AJXFimVLVrMui3Ujqr6mTi6RqjUsDEmsqhG1dg/exec');
+      const response = await fetch('https://script.google.com/macros/s/AKfycbywvEV6MHpfvbKU-OkeTaJsWsgZp_JQWDDB7cJNVJfLTQti07Emqlef1AlLqc87OjFrmg/exec');
       if (!response.ok) throw new Error('Network response was not ok');
       const events = await response.json();
 
-      // Обновляем события в календаре
+      // Обновляем события в календар
       ec.setOption('events', events);
 
       updateTitle();
