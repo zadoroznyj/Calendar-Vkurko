@@ -85,15 +85,15 @@
       color: #664;
     }
     .day-footer .circle {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  width: 56px;
-  height: 42px;
-  border-radius: 21px;
-  transition: background 0.2s, color 0.2s;
-}
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      width: 56px;
+      height: 42px;
+      border-radius: 21px;
+      transition: background 0.2s, color 0.2s;
+    }
     .day-footer .active .circle {
       background: #000;
       color: #fff;
@@ -142,6 +142,7 @@
   let lastClickedDate = null;
   let lastTapTime = 0;
 
+  // Создаем календарь без событий (пока)
   const ec = EventCalendar.create(document.getElementById("ec"), {
     view: "dayGridMonth",
     firstDay: 1,
@@ -153,7 +154,7 @@
       { id: 1, title: "Наталья" },
       { id: 2, title: "Ирина" },
     ],
-    events: createEvents(),
+    events: [], // пусто, загрузим ниже
     nowIndicator: true,
     selectable: true,
     dayMaxEvents: true,
@@ -166,6 +167,22 @@
       hour12: false
     }
   });
+
+  // Функция загрузки событий с твоего Google Apps Script
+  async function loadEvents() {
+    try {
+      const response = await fetch('https://script.google.com/macros/s/AKfycbw1PX4UarOEP2g74cyOSqT_Pj_TvqV0yJ268CY2zmthr5ma3vnMte9rhIyK5AW4uUNrPg/exec');
+      if (!response.ok) throw new Error('Network response was not ok');
+      const events = await response.json();
+
+      // Обновляем события в календаре
+      ec.setOption('events', events);
+
+      updateTitle();
+    } catch (error) {
+      console.error('Ошибка загрузки событий:', error);
+    }
+  }
 
   const calendarEl = document.getElementById("ec");
   const hammer = new Hammer(calendarEl);
@@ -325,40 +342,9 @@
     return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
   }
 
-  function createEvents() {
-    const today = new Date().toISOString().slice(0, 10);
-    return [
-      {
-        start: today + "T08:39:00",
-        end: today + "T10:39:00",
-        title: "Наращивание: Full Colour Short",
-        resourceId: 1,
-        color: "#2e8b57",
-      },
-      {
-        start: today + "T08:39:00",
-        end: today + "T10:39:00",
-        title: "Full Colour Short: Leonid Zadoroznyj",
-        resourceId: 2,
-        color: "#4682b4",
-      },
-      {
-        start: today,
-        title: "💵 Зарплата",
-        allDay: true,
-        resourceId: 2,
-        color: "#8888ff"
-      }
-    ];
-  }
+  // Загружаем события с сервера сразу после загрузки
+  loadEvents();
 
-  updateTitle();
 </script>
 </body>
 </html>
-
-Deployment ID
-AKfycbw1PX4UarOEP2g74cyOSqT_Pj_TvqV0yJ268CY2zmthr5ma3vnMte9rhIyK5AW4uUNrPg
-
-URL
-https://script.google.com/macros/s/AKfycbw1PX4UarOEP2g74cyOSqT_Pj_TvqV0yJ268CY2zmthr5ma3vnMte9rhIyK5AW4uUNrPg/exec
