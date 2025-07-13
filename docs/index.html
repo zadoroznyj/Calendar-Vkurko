@@ -141,10 +141,7 @@
   let touchEndX = 0;
   let lastClickedDate = null;
   let lastTapTime = 0;
-  let tapCount = 0;
-  let tapTimeout = null;
 
-  // Создаем календарь без событий (пока)
   const ec = EventCalendar.create(document.getElementById("ec"), {
     view: "dayGridMonth",
     firstDay: 1,
@@ -156,7 +153,7 @@
       { id: 1, title: "Наталья" },
       { id: 2, title: "Ирина" },
     ],
-    events: [], // пусто, загрузим ниже
+    events: [], // загрузим ниже
     nowIndicator: true,
     selectable: true,
     dayMaxEvents: true,
@@ -167,19 +164,23 @@
       hour: '2-digit',
       minute: '2-digit',
       hour12: false
+    },
+    // Добавляем поддержку выделения времени для создания события
+    select: function(info) {
+      createEventPrompt(info);
+    },
+    // Добавляем обработчик клика по событию для редактирования
+    eventClick: function(info) {
+      editEventPrompt(info.event);
     }
   });
 
-  // Функция загрузки событий с твоего Google Apps Script
   async function loadEvents() {
     try {
       const response = await fetch('https://script.google.com/macros/s/AKfycbywvEV6MHpfvbKU-OkeTaJsWsgZp_JQWDDB7cJNVJfLTQti07Emqlef1AlLqc87OjFrmg/exec');
       if (!response.ok) throw new Error('Network response was not ok');
       const events = await response.json();
-
-      // Обновляем события в календарь
       ec.setOption('events', events);
-
       updateTitle();
     } catch (error) {
       console.error('Ошибка загрузки событий:', error);
@@ -190,9 +191,8 @@
   const hammer = new Hammer(calendarEl);
   hammer.get("doubletap").set({ interval: 300 });
 
-  hammer.on("doubletap", function (ev) {
-    // Проверяем, что view - месяц и дата есть
-    if (ec.getOption("view") === "dayGridMonth" && lastClickedDate) {
+  hammer.on("doubletap", function () {
+    if (lastClickedDate && Date.now() - lastTapTime < 600) {
       ec.setOption("date", lastClickedDate);
       ec.setOption("view", "resourceTimeGridDay");
       updateActiveMode("resourceTimeGridDay");
@@ -239,6 +239,44 @@
     lastTapTime = Date.now();
   });
 
+  // --- Новое: запрос создания события
+  function createEventPrompt(selectInfo) {
+    const title = prompt("Введите название нового события:", "");
+    if (!title) return;
+    // Можно добавить запрос ресурса и др. параметров, здесь базовый пример
+    const newEvent = {
+      id: 'temp-' + Date.now(),
+      title: title,
+      start: selectInfo.startStr,
+      end: selectInfo.endStr,
+      resourceId: selectInfo.resource ? selectInfo.resource.id : null,
+      allDay: selectInfo.allDay
+    };
+    // Добавляем в календарь локально
+    ec.addEvent(newEvent);
+    // TODO: отправить на сервер, чтобы сохранить (POST)
+    console.log("Добавлено событие", newEvent);
+  }
+
+  // --- Новое: запрос редактирования события
+  function editEventPrompt(event) {
+    const newTitle = prompt("Редактировать название события:", event.title);
+    if (newTitle === null) return; // отмена
+    if (newTitle === "") {
+      // удаление события если пустое название
+      if (confirm("Удалить событие?")) {
+        ec.removeEvent(event);
+        // TODO: удалить на сервере
+        console.log("Удалено событие", event);
+      }
+      return;
+    }
+    // Обновляем событие локально
+    event.setProp("title", newTitle);
+    // TODO: обновить на сервере
+    console.log("Обновлено событие", event);
+  }
+
   function updateActiveMode(viewName) {
     document.querySelectorAll("#modeSwitcher span").forEach(el => {
       el.classList.toggle("active", el.dataset.view === viewName);
@@ -271,82 +309,82 @@
   }
 
   function updateMonthFooter(currentDate) {
-    const footer = document.getElementById("monthFooter");
-    const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-    const today = new Date();
-    const currentMonthIndex = currentDate.getMonth();
-    const currentYear = currentDate.getFullYear();
+  const footer = document.getElementById("monthFooter");
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const today = new Date();
+  const currentMonthIndex = currentDate.getMonth();
+  const currentYear = currentDate.getFullYear();
 
-    footer.innerHTML = "";
+  footer.innerHTML = "";
 
-    for (let i = -3; i <= 3; i++) {
-      const date = new Date(currentYear, currentMonthIndex + i, 1);
-      const index = date.getMonth();
-      const year = date.getFullYear();
+  for (let i = -3; i <= 3; i++) {
+    const date = new Date(currentYear, currentMonthIndex + i, 1);
+    const index = date.getMonth();
+    const year = date.getFullYear();
 
-      const span = document.createElement("span");
-      span.textContent = months[index];
-      span.dataset.month = index;
-      span.classList.toggle("active", i === 0);
+    const span = document.createElement("span");
+    span.textContent = months[index];
+    span.dataset.month = index;
+    span.classList.toggle("active", i === 0);
 
-      const isTodayMonth = index === today.getMonth() && year === today.getFullYear();
-      const isSelected = i === 0;
+    const isTodayMonth = index === today.getMonth() && year === today.getFullYear();
+    const isSelected = i === 0;
 
-      if (isTodayMonth && !isSelected) {
-        span.classList.add("current-month");
-      }
-
-      span.addEventListener("click", () => {
-        const newDate = new Date(currentYear, index, 1);
-        ec.setOption("date", newDate.toISOString().slice(0, 10));
-        ec.setOption("view", "dayGridMonth");
-        updateTitle();
-      });
-
-      footer.appendChild(span);
+    if (isTodayMonth && !isSelected) {
+      span.classList.add("current-month");
     }
+
+    span.addEventListener("click", () => {
+      const newDate = new Date(currentYear, index, 1);
+      ec.setOption("date", newDate.toISOString().slice(0, 10));
+      ec.setOption("view", "dayGridMonth");
+      updateTitle();
+    });
+
+    footer.appendChild(span);
   }
+}
 
-  function updateDayFooterWithDates(date) {
-    const footer = document.getElementById("dayFooter");
-    footer.innerHTML = "";
+function updateDayFooterWithDates(date) {
+  const footer = document.getElementById("dayFooter");
+  footer.innerHTML = "";
 
-    const startOfWeek = new Date(date);
-    startOfWeek.setDate(date.getDate() - ((date.getDay() + 6) % 7)); // Monday
+  const startOfWeek = new Date(date);
+  startOfWeek.setDate(date.getDate() - ((date.getDay() + 6) % 7)); // Monday
 
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(startOfWeek);
-      d.setDate(d.getDate() + i);
-      const iso = d.toISOString().slice(0, 10);
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(startOfWeek);
+    d.setDate(d.getDate() + i);
+    const iso = d.toISOString().slice(0, 10);
 
-      const dow = d.toLocaleString('default', { weekday: 'short' });
-      const day = d.getDate();
-      const isActive = d.toDateString() === date.toDateString();
-      const month = d.toLocaleString('default', { month: 'short' });
+    const dow = d.toLocaleString('default', { weekday: 'short' });
+    const day = d.getDate();
+    const isActive = d.toDateString() === date.toDateString();
+    const month = d.toLocaleString('default', { month: 'short' });
 
-      const div = document.createElement("div");
-      div.className = "day-item" + (isActive ? " active" : "");
-      div.dataset.date = iso;
-      div.innerHTML = `
-        <div class="circle">
-          <div class="day-name">${dow}</div>
-          <div class="day-number">${day}</div>
-          ${isActive ? `<div class="day-month">${month}</div>` : ""}
-        </div>
-      `;
-      footer.appendChild(div);
-    }
+    const div = document.createElement("div");
+    div.className = "day-item" + (isActive ? " active" : "");
+    div.dataset.date = iso;
+    div.innerHTML = `
+      <div class="circle">
+        <div class="day-name">${dow}</div>
+        <div class="day-number">${day}</div>
+        ${isActive ? `<div class="day-month">${month}</div>` : ""}
+      </div>
+    `;
+    footer.appendChild(div);
   }
+}
 
-  function getWeekNumber(d) {
-    d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
-    d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
-    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-    return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
-  }
+function getWeekNumber(d) {
+  d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+}
 
-  // Загружаем события с сервера сразу после загрузки
-  loadEvents();
+// Загружаем события с сервера сразу после загрузки
+loadEvents();
 
 </script>
 </body>
