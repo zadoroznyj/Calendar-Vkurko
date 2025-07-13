@@ -357,30 +357,8 @@
 </body>
 </html>
 
-function doGet() {
-  const ss = SpreadsheetApp.openById("1gW4ZD30gfiZqzT8e2ZATtfFljxHr2tiyMS6l_HEwFEs");
-  const sheet = ss.getSheetByName("Sheet"); // Имя листа с данными
-  const data = sheet.getDataRange().getValues();
+Deployment ID
+AKfycbwluE9LDnTiDEw74YMQ4TfIjt8yN6hDGvqkyG0ot7Nl-fagWYYzdxGfwoPCoDKvQlrlTQ
 
-  const events = [];
-
-  // data[i] - строка i
-  // data[i][j] - столбец j в строке i
-
-  for (let i = 1; i < data.length; i++) {  // пропускаем заголовок i=0
-    const row = data[i];
-    if (!row[2]) continue; // если нет Start, пропускаем
-
-    events.push({
-      title: row[1] || "Без названия",                // Title - 2-й столбец
-      start: row[2],                                  // Start - 3-й столбец
-      end: row[3] || row[2],                          // End - 4-й столбец
-      resourceId: row[4] || 1,                        // resourceid - 5-й столбец
-      color: row[5] || "#3788d8",                     // colour - 6-й столбец
-      allDay: row[9] === true || row[9] === "TRUE"   // allDay - 10-й столбец
-    });
-  }
-
-  return ContentService.createTextOutput(JSON.stringify(events))
-    .setMimeType(ContentService.MimeType.JSON);
-}
+URL
+https://script.google.com/macros/s/AKfycbwluE9LDnTiDEw74YMQ4TfIjt8yN6hDGvqkyG0ot7Nl-fagWYYzdxGfwoPCoDKvQlrlTQ/exec
