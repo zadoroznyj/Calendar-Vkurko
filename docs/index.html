@@ -1,3 +1,11 @@
+if (e.postData && e.postData.contents) {
+  try {
+    body = JSON.parse(e.postData.contents);
+  } catch (err) {
+    body = e.parameter || {};
+  }
+}
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
