@@ -359,26 +359,22 @@
 
 function doGet() {
   const ss = SpreadsheetApp.openById("1gW4ZD30gfiZqzT8e2ZATtfFljxHr2tiyMS6l_HEwFEs");
-  const sheet = ss.getSheetByName("Sheet"); // правильное имя листа
+  const sheet = ss.getSheetByName("Sheet"); // Имя листа, где данные
   const data = sheet.getDataRange().getValues();
 
   const events = [];
 
-  // Предполагается, что первая строка - заголовки:
-  // Title | Start | End | resourceId | colour | ... | allDay
-  // Индексы: 1=Title, 2=Start, 3=End, 4=resourceId, 5=colour, ..., 9=allDay (нумерация с 0)
-
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
-    if (!row[1]) continue; // если нет Start, пропускаем
+    if (!row[2]) continue; // Если нет Start (индекс 2), пропускаем
 
     events.push({
-      title: row[1] || "Без названия",         // Title (столбец B, index 1)
-      start: row[2] || row[1],                 // Start (C) или Start если нет (индекс 2)
-      end: row[3] || row[2],                   // End (D) или Start (C) (индекс 3)
-      resourceId: row[4] || 1,                 // resourceId (E, index 4)
-      color: row[5] || "#3788d8",              // colour (F, index 5)
-      allDay: row[9] === true || row[9] === "TRUE" // allDay (J, index 9), в гугл таблицах TRUE либо текст "TRUE"
+      title: row[1] || "Без названия",          // Title (index 1)
+      start: row[2],                            // Start (index 2)
+      end: row[3] || row[2],                    // End (index 3) или Start если нет
+      resourceId: row[4] || 1,                   // resourceid (index 4)
+      color: row[5] || "#3788d8",                // colour (index 5)
+      allDay: row[9] === true || row[9] === "TRUE" // allDay (index 9), true или строка "TRUE"
     });
   }
 
