@@ -1,140 +1,122 @@
+function doGet() {
+  const ss = SpreadsheetApp.openById("1gW4ZD30gfiZqzT8e2ZATtfFljxHr2tiyMS6l_HEwFEs");
+  const sheet = ss.getSheetByName("Events");
+  const data = sheet.getDataRange().getValues();
+
+  const events = [];
+
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+
+    const title = row[1];
+    const start = row[2];
+    const end = row[3];
+    const resourceIdRaw = row[6];
+    const color = row[5];
+    const allDayRaw = row[9];
+
+    if (!start || !end) continue;
+
+    const resourceId = resourceIdRaw === "master1" ? 1 :
+                       resourceIdRaw === "master2" ? 2 : null;
+
+    if (!resourceId) continue;
+
+    const event = {
+      id: row[0],
+      title: title || "Без названия",
+      start: start,
+      end: end,
+      resourceId: resourceId,
+      color: color || "#3788d8"
+    };
+
+    if (typeof allDayRaw === "boolean") {
+      event.allDay = allDayRaw;
+    } else if (typeof allDayRaw === "string") {
+      event.allDay = allDayRaw.toLowerCase() === "true";
+    }
+
+    events.push(event);
+  }
+
+  return ContentService
+    .createTextOutput(JSON.stringify(events))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+// Обработка preflight OPTIONS запроса
+function doOptions(e) {
+  return HtmlService.createHtmlOutput("")
+    .append("<script>/* CORS preflight allowed */</script>");
+}
+
 function doPost(e) {
   try {
-    const data = e.parameter;
+    const ss = SpreadsheetApp.openById("1gW4ZD30gfiZqzT8e2ZATtfFljxHr2tiyMS6l_HEwFEs");
+    const sheet = ss.getSheetByName("Events");
+    const body = JSON.parse(e.postData.contents);
+    const action = body.action;
+    let response = {};
 
-    // Карта календарей
-    const calendarMap = {
-      "master1": "irina.salon11@gmail.com",
-      "master2": "primary"
-    };
-
-    // ID Google Таблицы
-    const sheetId = '1gW4ZD30gfiZqzT8e2ZATtfFljxHr2tiyMS6l_HEwFEs';
-
-    // Генерируем GroupID для пары событий
-    const groupId = new Date().getTime().toString();
-
-    // Выбираем календарь по полю "calendar", по умолчанию master1
-    const calendarKey = data.calendar || "master1";
-    const calendarId = calendarMap[calendarKey];
-
-    if (!calendarId) {
-      throw new Error("Unknown calendar key: " + calendarKey);
+    if (action === "create") {
+      const newId = Utilities.getUuid();
+      sheet.appendRow([
+        newId,
+        body.title,
+        body.start,
+        body.end,
+        "",
+        body.color || "",
+        body.resourceId === 1 ? "master1" : "master2",
+        "", "", body.allDay || false
+      ]);
+      response = { status: "created", id: newId };
     }
 
-    // Основное событие
-    const title = data.title || "Без названия";
-    const description = data.description || "";
-    const location = data.location || "";
-    const start = new Date(data.startTime);
-    const end = new Date(data.endTime);
-
-    // Создание события через Advanced Calendar API без участников
-    const event = {
-      summary: title,
-      description: description,
-      location: location,
-      start: {
-        dateTime: start.toISOString(),
-        timeZone: Session.getScriptTimeZone()
-      },
-      end: {
-        dateTime: end.toISOString(),
-        timeZone: Session.getScriptTimeZone()
-      },
-      guestsCanInviteOthers: false,
-      guestsCanSeeOtherGuests: false
-    };
-
-    // Создаём основное событие и получаем объект созданного
-    const createdEvent = Calendar.Events.insert(event, calendarId);
-
-    // Функция для записи события в таблицу через Sheets API с GroupID
-    function saveEventToSheet(eventObj, calendarKeyForRecord, groupIdForRecord) {
-      const values = [[
-        eventObj.id || '',
-        eventObj.summary || '',
-        eventObj.start.dateTime || '',
-        eventObj.end.dateTime || '',
-        calendarKeyForRecord || '',
-        eventObj.description || '',
-        groupIdForRecord || ''
-      ]];
-
-      const resource = {
-        values: values
-      };
-
-      Sheets.Spreadsheets.Values.append(resource, sheetId, 'Events!A:G', {
-        valueInputOption: 'RAW',
-        insertDataOption: 'INSERT_ROWS'
-      });
+    else if (action === "update") {
+      const id = body.id;
+      const data = sheet.getDataRange().getValues();
+      for (let i = 1; i < data.length; i++) {
+        if (data[i][0] === id) {
+          sheet.getRange(i + 1, 2).setValue(body.title);
+          sheet.getRange(i + 1, 3).setValue(body.start);
+          sheet.getRange(i + 1, 4).setValue(body.end);
+          sheet.getRange(i + 1, 6).setValue(body.color || "");
+          sheet.getRange(i + 1, 7).setValue(body.resourceId === 1 ? "master1" : "master2");
+          sheet.getRange(i + 1, 10).setValue(body.allDay || false);
+          response = { status: "updated", id: id };
+          break;
+        }
+      }
+      if (!response.status) response = { status: "not_found", id: id };
     }
 
-    // Записываем основное событие в таблицу с GroupID
-    saveEventToSheet(createdEvent, calendarKey, groupId);
-
-    // Проверяем HELP в additionalNotes или description
-    const helpSource = data.additionalNotes || description || '';
-    const helpMatch = helpSource.match(/HELP\s*\(\s*([^)]+?)\s*\)\s*(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})/i);
-
-    if (helpMatch) {
-      const helpService = helpMatch[1];
-      const helpStart = helpMatch[2];
-      const helpEnd = helpMatch[3];
-
-      const otherKey = (calendarKey === "master1") ? "master2" : "master1";
-      const otherCalendarId = calendarMap[otherKey];
-
-      const baseDate = new Date(start);
-      const year = baseDate.getFullYear();
-      const month = baseDate.getMonth();
-      const day = baseDate.getDate();
-
-      const [startH, startM] = helpStart.split(':').map(Number);
-      const [endH, endM] = helpEnd.split(':').map(Number);
-
-      const helpStartDate = new Date(year, month, day, startH, startM);
-      const helpEndDate = new Date(year, month, day, endH, endM);
-
-      const clientName = title.replace(/^(Стрижка|Покраска|Наращивание|Другое)\s*[:\-]?\s*/i, '').trim();
-      const helpTitle = `${helpService}: ${clientName} (Передано Натльей)`;
-
-      const helpEvent = {
-        summary: helpTitle,
-        description: description,
-        location: location,
-        start: {
-          dateTime: helpStartDate.toISOString(),
-          timeZone: Session.getScriptTimeZone()
-        },
-        end: {
-          dateTime: helpEndDate.toISOString(),
-          timeZone: Session.getScriptTimeZone()
-        },
-        attendees: [],
-        guestsCanInviteOthers: false,
-        guestsCanSeeOtherGuests: false
-      };
-
-      // Создаём вспомогательное событие и получаем объект
-      const createdHelpEvent = Calendar.Events.insert(helpEvent, otherCalendarId);
-
-      // Записываем вспомогательное событие в таблицу с тем же GroupID
-      saveEventToSheet(createdHelpEvent, otherKey, groupId);
+    else if (action === "delete") {
+      const id = body.id;
+      const data = sheet.getDataRange().getValues();
+      for (let i = 1; i < data.length; i++) {
+        if (data[i][0] === id) {
+          sheet.deleteRow(i + 1);
+          response = { status: "deleted", id: id };
+          break;
+        }
+      }
+      if (!response.status) response = { status: "not_found", id: id };
     }
 
-    return ContentService.createTextOutput(JSON.stringify({
-      status: "ok",
-      calendar: calendarId,
-      created: { title: title, start: start, end: end }
-    })).setMimeType(ContentService.MimeType.JSON);
+    else {
+      response = { status: "invalid_action" };
+    }
+
+    return ContentService
+      .createTextOutput(JSON.stringify(response))
+      .setMimeType(ContentService.MimeType.JSON);
 
   } catch (err) {
-    return ContentService.createTextOutput(JSON.stringify({
-      status: "error",
-      message: err.toString()
-    })).setMimeType(ContentService.MimeType.JSON);
+    return ContentService
+      .createTextOutput(JSON.stringify({ status: "error", message: err.message }))
+      .setMimeType(ContentService.MimeType.JSON);
   }
 }
 
