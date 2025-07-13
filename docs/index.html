@@ -1,147 +1,3 @@
-function doGet() {
-  const ss = SpreadsheetApp.openById("1gW4ZD30gfiZqzT8e2ZATtfFljxHr2tiyMS6l_HEwFEs");
-  const sheet = ss.getSheetByName("Events");
-  const data = sheet.getDataRange().getValues();
-  const events = [];
-
-  for (let i = 1; i < data.length; i++) {
-    const row = data[i];
-    const title = row[1];
-    const start = row[2];
-    const end = row[3];
-    const resourceIdRaw = row[6];
-    const color = row[5];
-    const allDayRaw = row[9];
-
-    if (!start || !end) continue;
-
-    const resourceId = resourceIdRaw === "master1" ? 1 :
-                       resourceIdRaw === "master2" ? 2 : null;
-    if (!resourceId) continue;
-
-    const event = {
-      id: row[0],
-      title: title || "Без названия",
-      start: start,
-      end: end,
-      resourceId: resourceId,
-      color: color || "#3788d8"
-    };
-
-    if (typeof allDayRaw === "boolean") {
-      event.allDay = allDayRaw;
-    } else if (typeof allDayRaw === "string") {
-      event.allDay = allDayRaw.toLowerCase() === "true";
-    }
-
-    events.push(event);
-  }
-
-  return ContentService
-    .createTextOutput(JSON.stringify(events))
-    .setMimeType(ContentService.MimeType.JSON)
-    .setHeaders({
-      "Access-Control-Allow-Origin": "*"
-    });
-}
-
-function doOptions(e) {
-  return ContentService.createTextOutput("")
-    .setMimeType(ContentService.MimeType.TEXT)
-    .setHeaders({
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type"
-    });
-}
-
-function doPost(e) {
-  const output = ContentService.createTextOutput();
-  output.setMimeType(ContentService.MimeType.JSON);
-
-  try {
-    let body = {};
-    if (e.postData && e.postData.contents) {
-      try {
-        body = JSON.parse(e.postData.contents);
-      } catch (err) {
-        body = e.parameter || {};
-      }
-    }
-
-    const ss = SpreadsheetApp.openById("1gW4ZD30gfiZqzT8e2ZATtfFljxHr2tiyMS6l_HEwFEs");
-    const sheet = ss.getSheetByName("Events");
-    const action = body.action;
-
-    if (action === "create") {
-      const newId = Utilities.getUuid();
-      sheet.appendRow([
-        newId,
-        body.title,
-        body.start,
-        body.end,
-        "",
-        body.color || "",
-        body.resourceId == 1 ? "master1" : "master2",
-        "", "", body.allDay === "true" || body.allDay === true
-      ]);
-      return output
-        .setContent(JSON.stringify({ status: "created", id: newId }))
-        .setHeaders({ "Access-Control-Allow-Origin": "*" });
-    }
-
-    if (action === "update") {
-      const id = body.id;
-      const data = sheet.getDataRange().getValues();
-      for (let i = 1; i < data.length; i++) {
-        if (data[i][0] === id) {
-          sheet.getRange(i + 1, 2).setValue(body.title);
-          sheet.getRange(i + 1, 3).setValue(body.start);
-          sheet.getRange(i + 1, 4).setValue(body.end);
-          sheet.getRange(i + 1, 6).setValue(body.color || "");
-          sheet.getRange(i + 1, 7).setValue(body.resourceId == 1 ? "master1" : "master2");
-          sheet.getRange(i + 1, 10).setValue(body.allDay === "true" || body.allDay === true);
-          return output
-            .setContent(JSON.stringify({ status: "updated", id: id }))
-            .setHeaders({ "Access-Control-Allow-Origin": "*" });
-        }
-      }
-      return output
-        .setContent(JSON.stringify({ status: "not_found", id: id }))
-        .setHeaders({ "Access-Control-Allow-Origin": "*" });
-    }
-
-    if (action === "delete") {
-      const id = body.id;
-      const data = sheet.getDataRange().getValues();
-      for (let i = 1; i < data.length; i++) {
-        if (data[i][0] === id) {
-          sheet.deleteRow(i + 1);
-          return output
-            .setContent(JSON.stringify({ status: "deleted", id: id }))
-            .setHeaders({ "Access-Control-Allow-Origin": "*" });
-        }
-      }
-      return output
-        .setContent(JSON.stringify({ status: "not_found", id: id }))
-        .setHeaders({ "Access-Control-Allow-Origin": "*" });
-    }
-
-    return output
-      .setContent(JSON.stringify({ status: "invalid_action", received: body }))
-      .setHeaders({ "Access-Control-Allow-Origin": "*" });
-
-  } catch (err) {
-    return output
-      .setContent(JSON.stringify({ status: "error", message: err.message }))
-      .setHeaders({ "Access-Control-Allow-Origin": "*" });
-  }
-}
-
-
-
-
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -319,7 +175,7 @@ function doPost(e) {
 
   async function loadEvents() {
     try {
-      const response = await fetch('https://script.google.com/macros/s/AKfycbzyJFLuKnAcXNALaEvaJ3MvJs7ny0xTO0f8awdnhP7ZPW2wO7SWrJiI5TfGlsaiE5cksg/exec');
+      const response = await fetch('https://script.google.com/macros/s/AKfycbxwitJoErEN5b1QdHVgtYVIphJY8lxHNTB3gGsCoORytA0N8lHZxj0hgIJfH4V9olS1ZA/exec');
       if (!response.ok) throw new Error('Network response was not ok');
       const events = await response.json();
       ec.setOption('events', events);
@@ -396,7 +252,7 @@ function doPost(e) {
       color: "#3788d8"
     };
 
-    fetch('https://script.google.com/macros/s/AKfycbzyJFLuKnAcXNALaEvaJ3MvJs7ny0xTO0f8awdnhP7ZPW2wO7SWrJiI5TfGlsaiE5cksg/exec', {
+    fetch('https://script.google.com/macros/s/AKfycbxwitJoErEN5b1QdHVgtYVIphJY8lxHNTB3gGsCoORytA0N8lHZxj0hgIJfH4V9olS1ZA/exec', {
       method: "POST",
       body: JSON.stringify({
         action: "create",
@@ -425,7 +281,7 @@ function doPost(e) {
 
     if (newTitle === "") {
       if (confirm("Удалить событие?")) {
-        fetch('https://script.google.com/macros/s/AKfycbzyJFLuKnAcXNALaEvaJ3MvJs7ny0xTO0f8awdnhP7ZPW2wO7SWrJiI5TfGlsaiE5cksg/exec', {
+        fetch('https://script.google.com/macros/s/AKfycbxwitJoErEN5b1QdHVgtYVIphJY8lxHNTB3gGsCoORytA0N8lHZxj0hgIJfH4V9olS1ZA/exec', {
           method: "POST",
           body: JSON.stringify({
             action: "delete",
@@ -459,7 +315,7 @@ function doPost(e) {
       action: "update"
     };
 
-    fetch('https://script.google.com/macros/s/AKfycbzyJFLuKnAcXNALaEvaJ3MvJs7ny0xTO0f8awdnhP7ZPW2wO7SWrJiI5TfGlsaiE5cksg/exec', {
+    fetch('https://script.google.com/macros/s/AKfycbxwitJoErEN5b1QdHVgtYVIphJY8lxHNTB3gGsCoORytA0N8lHZxj0hgIJfH4V9olS1ZA/exec', {
       method: "POST",
       body: JSON.stringify(updatedEvent),
       headers: { "Content-Type": "application/json" }
