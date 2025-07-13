@@ -39,12 +39,20 @@ function doGet() {
 
   return ContentService
     .createTextOutput(JSON.stringify(events))
-    .setMimeType(ContentService.MimeType.JSON);
+    .setMimeType(ContentService.MimeType.JSON)
+    .setHeaders({
+      "Access-Control-Allow-Origin": "*"
+    });
 }
 
 function doOptions(e) {
   return ContentService.createTextOutput("")
-    .setMimeType(ContentService.MimeType.TEXT);
+    .setMimeType(ContentService.MimeType.TEXT)
+    .setHeaders({
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type"
+    });
 }
 
 function doPost(e) {
@@ -54,12 +62,12 @@ function doPost(e) {
   try {
     let body = {};
     if (e.postData && e.postData.contents) {
-  try {
-    body = JSON.parse(e.postData.contents);
-  } catch (err) {
-    body = e.parameter || {};
-  }
-}
+      try {
+        body = JSON.parse(e.postData.contents);
+      } catch (err) {
+        body = e.parameter || {};
+      }
+    }
 
     const ss = SpreadsheetApp.openById("1gW4ZD30gfiZqzT8e2ZATtfFljxHr2tiyMS6l_HEwFEs");
     const sheet = ss.getSheetByName("Events");
@@ -77,8 +85,9 @@ function doPost(e) {
         body.resourceId == 1 ? "master1" : "master2",
         "", "", body.allDay === "true" || body.allDay === true
       ]);
-      output.setContent(JSON.stringify({ status: "created", id: newId }));
-      return output;
+      return output
+        .setContent(JSON.stringify({ status: "created", id: newId }))
+        .setHeaders({ "Access-Control-Allow-Origin": "*" });
     }
 
     if (action === "update") {
@@ -92,12 +101,14 @@ function doPost(e) {
           sheet.getRange(i + 1, 6).setValue(body.color || "");
           sheet.getRange(i + 1, 7).setValue(body.resourceId == 1 ? "master1" : "master2");
           sheet.getRange(i + 1, 10).setValue(body.allDay === "true" || body.allDay === true);
-          output.setContent(JSON.stringify({ status: "updated", id: id }));
-          return output;
+          return output
+            .setContent(JSON.stringify({ status: "updated", id: id }))
+            .setHeaders({ "Access-Control-Allow-Origin": "*" });
         }
       }
-      output.setContent(JSON.stringify({ status: "not_found", id: id }));
-      return output;
+      return output
+        .setContent(JSON.stringify({ status: "not_found", id: id }))
+        .setHeaders({ "Access-Control-Allow-Origin": "*" });
     }
 
     if (action === "delete") {
@@ -106,20 +117,24 @@ function doPost(e) {
       for (let i = 1; i < data.length; i++) {
         if (data[i][0] === id) {
           sheet.deleteRow(i + 1);
-          output.setContent(JSON.stringify({ status: "deleted", id: id }));
-          return output;
+          return output
+            .setContent(JSON.stringify({ status: "deleted", id: id }))
+            .setHeaders({ "Access-Control-Allow-Origin": "*" });
         }
       }
-      output.setContent(JSON.stringify({ status: "not_found", id: id }));
-      return output;
+      return output
+        .setContent(JSON.stringify({ status: "not_found", id: id }))
+        .setHeaders({ "Access-Control-Allow-Origin": "*" });
     }
 
-    output.setContent(JSON.stringify({ status: "invalid_action", received: body }));
-    return output;
+    return output
+      .setContent(JSON.stringify({ status: "invalid_action", received: body }))
+      .setHeaders({ "Access-Control-Allow-Origin": "*" });
 
   } catch (err) {
-    output.setContent(JSON.stringify({ status: "error", message: err.message }));
-    return output;
+    return output
+      .setContent(JSON.stringify({ status: "error", message: err.message }))
+      .setHeaders({ "Access-Control-Allow-Origin": "*" });
   }
 }
 
