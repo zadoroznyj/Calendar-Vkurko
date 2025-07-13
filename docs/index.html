@@ -171,7 +171,7 @@
   // Функция загрузки событий с твоего Google Apps Script
   async function loadEvents() {
     try {
-      const response = await fetch('https://script.google.com/macros/s/AKfycbxHYjyo0tOE1CZjFTalCXHe1rR7C2Vi7d00Bxaz0yUhTCbZZzgZcNDTpZJsjp0JX-pWuw/exec');
+      const response = await fetch('https://script.google.com/macros/s/AKfycbxX8M88_XZ8hY0RDFT-mXAPl4FAR0iLsBGLigL2qHIl52Ux0KVu3ousAi1d46taX-I/exec');
       if (!response.ok) throw new Error('Network response was not ok');
       const events = await response.json();
 
