@@ -175,7 +175,7 @@
 
   async function loadEvents() {
     try {
-      const response = await fetch('https://script.google.com/macros/s/AKfycbwgi0hKmFU_RiYMR-_3SIO4pC6C8lMD2yplRHh72_608vYQnYdIfy5r1bL7V8A9xc5L2A/exec');
+      const response = await fetch('https://script.google.com/macros/s/AKfycbyezxuypsU1vcpoDVHd9j0mmWvJko1NEwdqGOFueeR8hro6crXF5P6CrSvTrGf9eomtZg/exec');
       if (!response.ok) throw new Error('Network response was not ok');
       const events = await response.json();
       ec.setOption('events', events);
@@ -252,7 +252,7 @@
       color: "#3788d8"
     };
 
-    fetch('https://script.google.com/macros/s/AKfycbwgi0hKmFU_RiYMR-_3SIO4pC6C8lMD2yplRHh72_608vYQnYdIfy5r1bL7V8A9xc5L2A/exec', {
+    fetch('https://script.google.com/macros/s/AKfycbyezxuypsU1vcpoDVHd9j0mmWvJko1NEwdqGOFueeR8hro6crXF5P6CrSvTrGf9eomtZg/exec', {
       method: "POST",
       body: JSON.stringify({
         action: "create",
@@ -281,7 +281,7 @@
 
     if (newTitle === "") {
       if (confirm("Удалить событие?")) {
-        fetch('https://script.google.com/macros/s/AKfycbwgi0hKmFU_RiYMR-_3SIO4pC6C8lMD2yplRHh72_608vYQnYdIfy5r1bL7V8A9xc5L2A/exec', {
+        fetch('https://script.google.com/macros/s/AKfycbyezxuypsU1vcpoDVHd9j0mmWvJko1NEwdqGOFueeR8hro6crXF5P6CrSvTrGf9eomtZg/exec', {
           method: "POST",
           body: JSON.stringify({
             action: "delete",
@@ -315,7 +315,7 @@
       action: "update"
     };
 
-    fetch('https://script.google.com/macros/s/AKfycbwgi0hKmFU_RiYMR-_3SIO4pC6C8lMD2yplRHh72_608vYQnYdIfy5r1bL7V8A9xc5L2A/exec', {
+    fetch('https://script.google.com/macros/s/AKfycbyezxuypsU1vcpoDVHd9j0mmWvJko1NEwdqGOFueeR8hro6crXF5P6CrSvTrGf9eomtZg/exec', {
       method: "POST",
       body: JSON.stringify(updatedEvent),
       headers: { "Content-Type": "application/json" }
