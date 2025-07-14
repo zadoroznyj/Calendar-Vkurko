@@ -27,13 +27,28 @@ function doGet(e) {
   }
 
   return ContentService.createTextOutput(JSON.stringify(events))
-    .setMimeType(ContentService.MimeType.JSON);
+    .setMimeType(ContentService.MimeType.JSON)
+    .setHeader("Access-Control-Allow-Origin", "*")
+    .setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+    .setHeader("Access-Control-Allow-Headers", "Content-Type");
 }
 
 function doPost(e) {
+  // Обработка preflight OPTIONS внутри doPost
+  if (e && e.method === "OPTIONS") {
+    return ContentService.createTextOutput('')
+      .setMimeType(ContentService.MimeType.TEXT)
+      .setHeader("Access-Control-Allow-Origin", "*")
+      .setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+      .setHeader("Access-Control-Allow-Headers", "Content-Type");
+  }
+
   Logger.log(JSON.stringify(e));
   const output = ContentService.createTextOutput();
   output.setMimeType(ContentService.MimeType.JSON);
+  output.setHeader("Access-Control-Allow-Origin", "*");
+  output.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  output.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
   try {
     let body = {};
@@ -165,11 +180,11 @@ function doPost(e) {
 }
 
 // CORS preflight OPTIONS handler - возвращает пустой ответ, без установки заголовков
+// Можно оставить или убрать, но в doPost теперь обрабатывается OPTIONS
 function doOptions() {
   return ContentService.createTextOutput('')
     .setMimeType(ContentService.MimeType.TEXT);
 }
-
 
 
 
