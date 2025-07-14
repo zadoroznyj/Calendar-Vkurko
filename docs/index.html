@@ -1,3 +1,37 @@
+fetch('https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    action: 'create',
+    title: 'Test Event',
+    start: '2025-07-14T10:00:00',
+    end: '2025-07-14T11:00:00',
+    calendarKey: 'master1'
+  })
+})
+.then(r => r.json())
+.then(console.log)
+.catch(console.error);
+
+Promise {<pending>}[[Prototype]]: Promise[[PromiseState]]: "fulfilled"[[PromiseResult]]: undefined
+Calendar-Vkurko/:1 Access to fetch at 'https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec' from origin 'https://zadoroznyj.github.io' has been blocked by CORS policy: Response to preflight request doesn't pass access control check: No 'Access-Control-Allow-Origin' header is present on the requested resource.Understand this error
+VM1112:1  POST https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec net::ERR_FAILED
+(anonymous) @ VM1112:1Understand this error
+TypeError: Failed to fetch
+    at <anonymous>:1:1
+Promise.catch
+(anonymous) @ VM1112:14Understand this error
+
+
+
+
+
+
+
+
+
+
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
