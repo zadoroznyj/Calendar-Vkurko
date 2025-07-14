@@ -1,65 +1,3 @@
-function doGet(e) {
-  const ss = SpreadsheetApp.openById("1gW4ZD30gfiZqzT8e2ZATtfFljxHr2tiyMS6l_HEwFEs");
-  const sheet = ss.getSheetByName("Events");
-  const data = sheet.getDataRange().getValues();
-  const events = [];
-
-  for (let i = 1; i < data.length; i++) {
-    const row = data[i];
-    const title = row[1];
-    const start = row[2];
-    const end = row[3];
-    const resourceIdRaw = row[6];
-    const color = row[5];
-    const allDayRaw = row[9];
-
-    if (!start || !end) continue;
-
-    const resourceId = resourceIdRaw === "master1" ? 1 :
-                       resourceIdRaw === "master2" ? 2 : null;
-    if (!resourceId) continue;
-
-    const event = {
-      id: row[0],
-      title: title || "Без названия",
-      start: start,
-      end: end,
-      resourceId: resourceId,
-      color: color || "#3788d8"
-    };
-
-    if (typeof allDayRaw === "boolean") {
-      event.allDay = allDayRaw;
-    } else if (typeof allDayRaw === "string") {
-      event.allDay = allDayRaw.toLowerCase() === "true";
-    }
-
-    events.push(event);
-  }
-
-  const response = ContentService
-    .createTextOutput(JSON.stringify(events))
-    .setMimeType(ContentService.MimeType.JSON);
-
-  // 🟡 ЭТО ОБЯЗАТЕЛЬНО ДЛЯ CORS
-  response.setHeaders({
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type"
-  });
-
-  return response;
-}
-
-
-
-
-
-
-
-
-
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -237,7 +175,7 @@ function doGet(e) {
 
   async function loadEvents() {
     try {
-      const response = await fetch('https://script.google.com/macros/s/AKfycby9G6kMHudGP41nttJ1T8vTLzfcGQJEXZ3zkInxcpA6WDQMp8yXN-Glnk_6MT8eThjjLw/exec');
+      const response = await fetch('https://script.google.com/macros/s/AKfycbz-Uf2R4cL0Z6kETJmOuSoeL7nL7ZlIZKSmMueUqlBa5z3zy1IDTmp591-oRnWnUrSuPQ/exec');
       if (!response.ok) throw new Error('Network response was not ok');
       const events = await response.json();
       ec.setOption('events', events);
@@ -314,7 +252,7 @@ function doGet(e) {
       color: "#3788d8"
     };
 
-    fetch('https://script.google.com/macros/s/AKfycby9G6kMHudGP41nttJ1T8vTLzfcGQJEXZ3zkInxcpA6WDQMp8yXN-Glnk_6MT8eThjjLw/exec', {
+    fetch('https://script.google.com/macros/s/AKfycbz-Uf2R4cL0Z6kETJmOuSoeL7nL7ZlIZKSmMueUqlBa5z3zy1IDTmp591-oRnWnUrSuPQ/exec', {
       method: "POST",
       body: JSON.stringify({
         action: "create",
@@ -343,7 +281,7 @@ function doGet(e) {
 
     if (newTitle === "") {
       if (confirm("Удалить событие?")) {
-        fetch('https://script.google.com/macros/s/AKfycby9G6kMHudGP41nttJ1T8vTLzfcGQJEXZ3zkInxcpA6WDQMp8yXN-Glnk_6MT8eThjjLw/exec', {
+        fetch('https://script.google.com/macros/s/AKfycbz-Uf2R4cL0Z6kETJmOuSoeL7nL7ZlIZKSmMueUqlBa5z3zy1IDTmp591-oRnWnUrSuPQ/exec', {
           method: "POST",
           body: JSON.stringify({
             action: "delete",
@@ -377,7 +315,7 @@ function doGet(e) {
       action: "update"
     };
 
-    fetch('https://script.google.com/macros/s/AKfycby9G6kMHudGP41nttJ1T8vTLzfcGQJEXZ3zkInxcpA6WDQMp8yXN-Glnk_6MT8eThjjLw/exec', {
+    fetch('https://script.google.com/macros/s/AKfycbz-Uf2R4cL0Z6kETJmOuSoeL7nL7ZlIZKSmMueUqlBa5z3zy1IDTmp591-oRnWnUrSuPQ/exec', {
       method: "POST",
       body: JSON.stringify(updatedEvent),
       headers: { "Content-Type": "application/json" }
