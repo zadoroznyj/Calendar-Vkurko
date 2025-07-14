@@ -1,23 +1,54 @@
-return output.setHeaders({
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type"
-});
+function doGet(e) {
+  const ss = SpreadsheetApp.openById("1gW4ZD30gfiZqzT8e2ZATtfFljxHr2tiyMS6l_HEwFEs");
+  const sheet = ss.getSheetByName("Events");
+  const data = sheet.getDataRange().getValues();
+  const events = [];
 
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    const title = row[1];
+    const start = row[2];
+    const end = row[3];
+    const resourceIdRaw = row[6];
+    const color = row[5];
+    const allDayRaw = row[9];
 
+    if (!start || !end) continue;
 
+    const resourceId = resourceIdRaw === "master1" ? 1 :
+                       resourceIdRaw === "master2" ? 2 : null;
+    if (!resourceId) continue;
 
+    const event = {
+      id: row[0],
+      title: title || "Без названия",
+      start: start,
+      end: end,
+      resourceId: resourceId,
+      color: color || "#3788d8"
+    };
 
+    if (typeof allDayRaw === "boolean") {
+      event.allDay = allDayRaw;
+    } else if (typeof allDayRaw === "string") {
+      event.allDay = allDayRaw.toLowerCase() === "true";
+    }
 
+    events.push(event);
+  }
 
-function doOptions(e) {
-  return ContentService.createTextOutput("")
-    .setMimeType(ContentService.MimeType.TEXT)
-    .setHeaders({
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type"
-    });
+  const response = ContentService
+    .createTextOutput(JSON.stringify(events))
+    .setMimeType(ContentService.MimeType.JSON);
+
+  // 🟡 ЭТО ОБЯЗАТЕЛЬНО ДЛЯ CORS
+  response.setHeaders({
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type"
+  });
+
+  return response;
 }
 
 
