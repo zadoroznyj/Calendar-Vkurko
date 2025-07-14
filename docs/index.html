@@ -44,7 +44,12 @@ function doGet() {
 
 function doOptions(e) {
   return ContentService.createTextOutput("")
-    .setMimeType(ContentService.MimeType.TEXT);
+    .setMimeType(ContentService.MimeType.TEXT)
+    .setHeaders({
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type"
+    });
 }
 
 function doPost(e) {
@@ -54,12 +59,12 @@ function doPost(e) {
   try {
     let body = {};
     if (e.postData && e.postData.contents) {
-  try {
-    body = JSON.parse(e.postData.contents);
-  } catch (err) {
-    body = e.parameter || {};
-  }
-}
+      try {
+        body = JSON.parse(e.postData.contents);
+      } catch (err) {
+        body = e.parameter || {};
+      }
+    }
 
     const ss = SpreadsheetApp.openById("1gW4ZD30gfiZqzT8e2ZATtfFljxHr2tiyMS6l_HEwFEs");
     const sheet = ss.getSheetByName("Events");
@@ -78,7 +83,11 @@ function doPost(e) {
         "", "", body.allDay === "true" || body.allDay === true
       ]);
       output.setContent(JSON.stringify({ status: "created", id: newId }));
-      return output;
+      return output.setHeaders({
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type"
+      });
     }
 
     if (action === "update") {
@@ -93,11 +102,19 @@ function doPost(e) {
           sheet.getRange(i + 1, 7).setValue(body.resourceId == 1 ? "master1" : "master2");
           sheet.getRange(i + 1, 10).setValue(body.allDay === "true" || body.allDay === true);
           output.setContent(JSON.stringify({ status: "updated", id: id }));
-          return output;
+          return output.setHeaders({
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type"
+          });
         }
       }
       output.setContent(JSON.stringify({ status: "not_found", id: id }));
-      return output;
+      return output.setHeaders({
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type"
+      });
     }
 
     if (action === "delete") {
@@ -107,56 +124,37 @@ function doPost(e) {
         if (data[i][0] === id) {
           sheet.deleteRow(i + 1);
           output.setContent(JSON.stringify({ status: "deleted", id: id }));
-          return output;
+          return output.setHeaders({
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type"
+          });
         }
       }
       output.setContent(JSON.stringify({ status: "not_found", id: id }));
-      return output;
+      return output.setHeaders({
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type"
+      });
     }
 
     output.setContent(JSON.stringify({ status: "invalid_action", received: body }));
-    return output;
+    return output.setHeaders({
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type"
+    });
 
   } catch (err) {
     output.setContent(JSON.stringify({ status: "error", message: err.message }));
-    return output;
+    return output.setHeaders({
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type"
+    });
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Access to fetch at 'https://script.google.com/macros/s/AKfycbzXtFeIJcxhGNxxmy4XGOvoNNopYKO93ogwXuSGv98esnCyldIl5yU1QIorgYBBcJT0cg/exec' from origin 'https://zadoroznyj.github.io' has been blocked by CORS policy: Response to preflight request doesn't pass access control check: No 'Access-Control-Allow-Origin' header is present on the requested resource.Understand this error
-Calendar-Vkurko/:318  POST https://script.google.com/macros/s/AKfycbzXtFeIJcxhGNxxmy4XGOvoNNopYKO93ogwXuSGv98esnCyldIl5yU1QIorgYBBcJT0cg/exec net::ERR_FAILED
-editEventPrompt @ Calendar-Vkurko/:318
-eventClick @ Calendar-Vkurko/:172
-(anonymous) @ index.iife.js:12
-Ao.Te.__click @ index.iife.js:12
-mr @ index.iife.js:12Understand this error
-Calendar-Vkurko/:332 Ошибка отправки update: TypeError: Failed to fetch
-    at editEventPrompt (Calendar-Vkurko/:318:5)
-    at eventClick (Calendar-Vkurko/:172:7)
-    at HTMLElement.<anonymous> (index.iife.js:12:1)
-    at Ao.Te.__click (index.iife.js:12:1)
-    at HTMLDivElement.mr (index.iife.js:12:1)
-(anonymous) @ Calendar-Vkurko/:332
-Promise.catch
-editEventPrompt @ Calendar-Vkurko/:331
-eventClick @ Calendar-Vkurko/:172
-(anonymous) @ index.iife.js:12
-Ao.Te.__click @ index.iife.js:12
-mr @ index.iife.js:12Understand this error
-
 
       
 
