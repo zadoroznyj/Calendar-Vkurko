@@ -1,194 +1,3 @@
-const SHEET_ID = '1gW4ZD30gfiZqzT8e2ZATtfFljxHr2tiyMS6l_HEwFEs';
-const SHEET_NAME = 'Events';
-
-const CALENDAR_MAP = {
-  "master1": "irina.salon11@gmail.com",
-  "master2": "primary"
-};
-
-function doGet(e) {
-  const ss = SpreadsheetApp.openById(SHEET_ID);
-  const sheet = ss.getSheetByName(SHEET_NAME);
-  const data = sheet.getDataRange().getValues();
-  const events = [];
-
-  for (let i = 1; i < data.length; i++) {
-    const row = data[i];
-    if (!row[0]) continue; // id
-
-    events.push({
-      id: row[0],
-      title: row[1],
-      start: row[2],
-      end: row[3],
-      calendarKey: row[4],
-      description: row[5]
-    });
-  }
-
-  return ContentService.createTextOutput(JSON.stringify(events))
-    .setMimeType(ContentService.MimeType.JSON)
-    .setHeader("Access-Control-Allow-Origin", "*");
-}
-
-function doPost(e) {
-  const output = ContentService.createTextOutput();
-  output.setMimeType(ContentService.MimeType.JSON);
-  output.setHeader("Access-Control-Allow-Origin", "*");
-
-  try {
-    let body = {};
-    if (e.postData && e.postData.contents) {
-      body = JSON.parse(e.postData.contents);
-    } else if (e.parameter) {
-      body = e.parameter;
-    } else {
-      throw new Error("No POST data received");
-    }
-
-    const action = body.action;
-    if (!action) throw new Error("No action specified");
-
-    const ss = SpreadsheetApp.openById(SHEET_ID);
-    const sheet = ss.getSheetByName(SHEET_NAME);
-
-    if (action === 'create') {
-      // Создание нового события
-      const calendarKey = body.calendarKey || "master1";
-      const calendarId = CALENDAR_MAP[calendarKey];
-      if (!calendarId) throw new Error("Unknown calendar key: " + calendarKey);
-
-      const start = new Date(body.start);
-      const end = new Date(body.end);
-
-      const eventResource = {
-        summary: body.title || "Без названия",
-        description: body.description || "",
-        start: {
-          dateTime: start.toISOString(),
-          timeZone: Session.getScriptTimeZone()
-        },
-        end: {
-          dateTime: end.toISOString(),
-          timeZone: Session.getScriptTimeZone()
-        }
-      };
-
-      // Создаём событие в календаре
-      const createdEvent = Calendar.Events.insert(eventResource, calendarId);
-
-      // Записываем в таблицу
-      sheet.appendRow([
-        createdEvent.id,
-        createdEvent.summary,
-        createdEvent.start.dateTime,
-        createdEvent.end.dateTime,
-        calendarKey,
-        createdEvent.description || ''
-      ]);
-
-      output.setContent(JSON.stringify({ status: "created", id: createdEvent.id }));
-      return output;
-
-    } else if (action === 'update') {
-      const id = body.id;
-      if (!id) throw new Error("No event id specified for update");
-
-      const calendarKey = body.calendarKey || "master1";
-      const calendarId = CALENDAR_MAP[calendarKey];
-      if (!calendarId) throw new Error("Unknown calendar key: " + calendarKey);
-
-      const start = new Date(body.start);
-      const end = new Date(body.end);
-
-      // Обновляем событие в календаре
-      const eventResource = {
-        summary: body.title || "Без названия",
-        description: body.description || "",
-        start: {
-          dateTime: start.toISOString(),
-          timeZone: Session.getScriptTimeZone()
-        },
-        end: {
-          dateTime: end.toISOString(),
-          timeZone: Session.getScriptTimeZone()
-        }
-      };
-
-      const updatedEvent = Calendar.Events.update(eventResource, calendarId, id);
-
-      // Обновляем в таблице
-      const data = sheet.getDataRange().getValues();
-      let found = false;
-      for (let i = 1; i < data.length; i++) {
-        if (data[i][0] === id) {
-          const row = i + 1;
-          sheet.getRange(row, 2).setValue(updatedEvent.summary);
-          sheet.getRange(row, 3).setValue(updatedEvent.start.dateTime);
-          sheet.getRange(row, 4).setValue(updatedEvent.end.dateTime);
-          sheet.getRange(row, 5).setValue(calendarKey);
-          sheet.getRange(row, 6).setValue(updatedEvent.description || '');
-          found = true;
-          break;
-        }
-      }
-      if (!found) throw new Error("Event ID not found in sheet");
-
-      output.setContent(JSON.stringify({ status: "updated", id: id }));
-      return output;
-
-    } else if (action === 'delete') {
-      const id = body.id;
-      if (!id) throw new Error("No event id specified for delete");
-
-      // Найдём событие в таблице и удалим
-      const data = sheet.getDataRange().getValues();
-      let foundRow = -1;
-      for (let i = 1; i < data.length; i++) {
-        if (data[i][0] === id) {
-          foundRow = i + 1;
-          break;
-        }
-      }
-      if (foundRow === -1) throw new Error("Event ID not found in sheet");
-
-      sheet.deleteRow(foundRow);
-
-      // Удаляем событие из календаря
-      let calendarKey = data[foundRow - 1][4];
-      let calendarId = CALENDAR_MAP[calendarKey] || CALENDAR_MAP["master1"];
-      Calendar.Events.remove(calendarId, id);
-
-      output.setContent(JSON.stringify({ status: "deleted", id: id }));
-      return output;
-
-    } else {
-      throw new Error("Unknown action: " + action);
-    }
-
-  } catch (err) {
-    output.setContent(JSON.stringify({ status: "error", message: err.message || err.toString() }));
-    return output;
-  }
-}
-
-// Обработка CORS preflight (OPTIONS запрос)
-function doOptions() {
-  return ContentService.createTextOutput('')
-    .setMimeType(ContentService.MimeType.TEXT)
-    .setHeader("Access-Control-Allow-Origin", "*")
-    .setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-    .setHeader("Access-Control-Allow-Headers", "Content-Type");
-}
-
-
-
-
-
-
-
-
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -366,7 +175,7 @@ function doOptions() {
 
   async function loadEvents() {
     try {
-      const response = await fetch('https://script.google.com/macros/s/AKfycbwGxMy_ZlJkOCOmKk4PfDHFEuSCDkUaSyWfWxN3bfgtPrUjD_FoSxkfKdfWbJ6X5eM0NA/exec');
+      const response = await fetch('https://script.google.com/macros/s/AKfycbwM24oFBPGF5v0SpKeSRXk7kPR7lVE8IJxjBZrtD1N7nLmaQZIY4D9r6PGeYkqT5NJpRw/exec');
       if (!response.ok) throw new Error('Network response was not ok');
       const events = await response.json();
       ec.setOption('events', events);
@@ -443,7 +252,7 @@ function doOptions() {
       color: "#3788d8"
     };
 
-    fetch('https://script.google.com/macros/s/AKfycbwGxMy_ZlJkOCOmKk4PfDHFEuSCDkUaSyWfWxN3bfgtPrUjD_FoSxkfKdfWbJ6X5eM0NA/exec', {
+    fetch('https://script.google.com/macros/s/AKfycbwM24oFBPGF5v0SpKeSRXk7kPR7lVE8IJxjBZrtD1N7nLmaQZIY4D9r6PGeYkqT5NJpRw/exec', {
       method: "POST",
       body: JSON.stringify({
         action: "create",
@@ -472,7 +281,7 @@ function doOptions() {
 
     if (newTitle === "") {
       if (confirm("Удалить событие?")) {
-        fetch('https://script.google.com/macros/s/AKfycbwGxMy_ZlJkOCOmKk4PfDHFEuSCDkUaSyWfWxN3bfgtPrUjD_FoSxkfKdfWbJ6X5eM0NA/exec', {
+        fetch('https://script.google.com/macros/s/AKfycbwM24oFBPGF5v0SpKeSRXk7kPR7lVE8IJxjBZrtD1N7nLmaQZIY4D9r6PGeYkqT5NJpRw/exec', {
           method: "POST",
           body: JSON.stringify({
             action: "delete",
@@ -506,7 +315,7 @@ function doOptions() {
       action: "update"
     };
 
-    fetch('https://script.google.com/macros/s/AKfycbwGxMy_ZlJkOCOmKk4PfDHFEuSCDkUaSyWfWxN3bfgtPrUjD_FoSxkfKdfWbJ6X5eM0NA/exec', {
+    fetch('https://script.google.com/macros/s/AKfycbwM24oFBPGF5v0SpKeSRXk7kPR7lVE8IJxjBZrtD1N7nLmaQZIY4D9r6PGeYkqT5NJpRw/exec', {
       method: "POST",
       body: JSON.stringify(updatedEvent),
       headers: { "Content-Type": "application/json" }
