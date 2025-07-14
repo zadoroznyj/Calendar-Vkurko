@@ -1,14 +1,139 @@
-Access to fetch at 'https://script.google.com/macros/s/AKfycbz-Uf2R4cL0Z6kETJmOuSoeL7nL7ZlIZKSmMueUqlBa5z3zy1IDTmp591-oRnWnUrSuPQ/exec' from origin 'https://zadoroznyj.github.io' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.Understand this error
-Calendar-Vkurko/:178  GET https://script.google.com/macros/s/AKfycbz-Uf2R4cL0Z6kETJmOuSoeL7nL7ZlIZKSmMueUqlBa5z3zy1IDTmp591-oRnWnUrSuPQ/exec net::ERR_FAILED 200 (OK)
-loadEvents @ Calendar-Vkurko/:178
-(anonymous) @ Calendar-Vkurko/:443Understand this error
-Calendar-Vkurko/:184 Ошибка загрузки событий: TypeError: Failed to fetch
-    at loadEvents (Calendar-Vkurko/:178:30)
-    at Calendar-Vkurko/:443:3
-loadEvents @ Calendar-Vkurko/:184
-await in loadEvents
-(anonymous) @ Calendar-Vkurko/:443Understand this error
+function doGet() {
+  const ss = SpreadsheetApp.openById("1gW4ZD30gfiZqzT8e2ZATtfFljxHr2tiyMS6l_HEwFEs");
+  const sheet = ss.getSheetByName("Events");
+  const data = sheet.getDataRange().getValues();
+  const events = [];
 
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    const title = row[1];
+    const start = row[2];
+    const end = row[3];
+    const resourceIdRaw = row[6];
+    const color = row[5];
+    const allDayRaw = row[9];
+
+    if (!start || !end) continue;
+
+    const resourceId = resourceIdRaw === "master1" ? 1 :
+                       resourceIdRaw === "master2" ? 2 : null;
+    if (!resourceId) continue;
+
+    const event = {
+      id: row[0],
+      title: title || "Без названия",
+      start: start,
+      end: end,
+      resourceId: resourceId,
+      color: color || "#3788d8"
+    };
+
+    if (typeof allDayRaw === "boolean") {
+      event.allDay = allDayRaw;
+    } else if (typeof allDayRaw === "string") {
+      event.allDay = allDayRaw.toLowerCase() === "true";
+    }
+
+    events.push(event);
+  }
+
+  const content = ContentService.createTextOutput(JSON.stringify(events));
+  content.setMimeType(ContentService.MimeType.JSON);
+
+  // Возвращаем CORS-заголовки через обёртку
+  return {
+    getContent: () => content.getContent(),
+    getMimeType: () => content.getMimeType(),
+    getHeaders: () => ({
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type"
+    })
+  };
+}
+
+function doOptions(e) {
+  return ContentService.createTextOutput("")
+    .setMimeType(ContentService.MimeType.TEXT);
+}
+
+function doPost(e) {
+  const output = ContentService.createTextOutput();
+  output.setMimeType(ContentService.MimeType.JSON);
+
+  try {
+    let body = {};
+    if (e.postData && e.postData.contents) {
+      try {
+        body = JSON.parse(e.postData.contents);
+      } catch (err) {
+        body = e.parameter || {};
+      }
+    }
+
+    const ss = SpreadsheetApp.openById("1gW4ZD30gfiZqzT8e2ZATtfFljxHr2tiyMS6l_HEwFEs");
+    const sheet = ss.getSheetByName("Events");
+    const action = body.action;
+
+    if (action === "create") {
+      const newId = Utilities.getUuid();
+      sheet.appendRow([
+        newId,
+        body.title,
+        body.start,
+        body.end,
+        "",
+        body.color || "",
+        body.resourceId == 1 ? "master1" : "master2",
+        "", "", body.allDay === "true" || body.allDay === true
+      ]);
+      output.setContent(JSON.stringify({ status: "created", id: newId }));
+    } else if (action === "update") {
+      const id = body.id;
+      const data = sheet.getDataRange().getValues();
+      let found = false;
+      for (let i = 1; i < data.length; i++) {
+        if (data[i][0] === id) {
+          sheet.getRange(i + 1, 2).setValue(body.title);
+          sheet.getRange(i + 1, 3).setValue(body.start);
+          sheet.getRange(i + 1, 4).setValue(body.end);
+          sheet.getRange(i + 1, 6).setValue(body.color || "");
+          sheet.getRange(i + 1, 7).setValue(body.resourceId == 1 ? "master1" : "master2");
+          sheet.getRange(i + 1, 10).setValue(body.allDay === "true" || body.allDay === true);
+          output.setContent(JSON.stringify({ status: "updated", id: id }));
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        output.setContent(JSON.stringify({ status: "not_found", id: id }));
+      }
+    } else if (action === "delete") {
+      const id = body.id;
+      const data = sheet.getDataRange().getValues();
+      let found = false;
+      for (let i = 1; i < data.length; i++) {
+        if (data[i][0] === id) {
+          sheet.deleteRow(i + 1);
+          output.setContent(JSON.stringify({ status: "deleted", id: id }));
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        output.setContent(JSON.stringify({ status: "not_found", id: id }));
+      }
+    } else {
+      output.setContent(JSON.stringify({ status: "invalid_action", received: body }));
+    }
+
+  } catch (err) {
+    output.setContent(JSON.stringify({ status: "error", message: err.message }));
+  }
+
+  // Вернём CORS-заголовки (хотя setHeaders не работает напрямую — можно через fetch workaround, но здесь не нужно)
+  return output;
+}
 
 
 
