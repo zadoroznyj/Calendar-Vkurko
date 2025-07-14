@@ -1,205 +1,207 @@
-fetch('https://script.google.com/macros/s/ТВОЙ_ID/exec', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json'
-  },
-  body: JSON.stringify({
-    action: 'create',
-    title: 'Test',
-    start: '2025-07-14T10:00:00',
-    end: '2025-07-14T11:00:00',
-    calendarKey: 'master1',
-    description: 'Пробный тест'
-  })
-})
-.then(res => res.json())
-.then(data => console.log('Ответ от сервера:', data))
-.catch(err => console.error('Ошибка:', err));
+const SHEET_ID = '1gW4ZD30gfiZqzT8e2ZATtfFljxHr2tiyMS6l_HEwFEs';
+const SHEET_NAME = 'Events';
 
-Access to fetch at 'https://script.google.com/macros/s/%D0%A2%D0%92%D0%9E%D0%99_ID/exec' from origin 'https://zadoroznyj.github.io' has been blocked by CORS policy: Response to preflight request doesn't pass access control check: No 'Access-Control-Allow-Origin' header is present on the requested resource.Understand this error
-VM1058:1  POST https://script.google.com/macros/s/%D0%A2%D0%92%D0%9E%D0%99_ID/exec net::ERR_FAILED
-(anonymous) @ VM1058:1Understand this error
-VM1058:17 Ошибка: TypeError: Failed to fetch
-    at <anonymous>:1:1
+const CALENDAR_MAP = {
+  "master1": "irina.salon11@gmail.com",
+  "master2": "primary"
+};
 
+function doGet(e) {
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  const sheet = ss.getSheetByName(SHEET_NAME);
+  const data = sheet.getDataRange().getValues();
+  const events = [];
 
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    if (!row[0]) continue;
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>EventCalendar</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@event-calendar/build@4.5.0/dist/event-calendar.min.css" />
-  <script src="https://cdn.jsdelivr.net/npm/@event-calendar/build@4.5.0/dist/event-calendar.min.js"></script>
-  <script src="https://hammerjs.github.io/dist/hammer.min.js"></script>
-  <style>
-    body {
-      margin: 0;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #fff;
-      color: #000;
-    }
-    header, footer {
-      padding: 8px 16px;
-      background: #fff;
-    }
-    .mode-switcher {
-      display: flex;
-      justify-content: space-around;
-      font-size: 16px;
-      padding: 8px 0;
-      font-weight: 500;
-    }
-    .mode-switcher span {
-      color: #555;
-      cursor: pointer;
-      padding: 4px 12px;
-      border-radius: 16px;
-      transition: background 0.2s, color 0.2s;
-    }
-    .mode-switcher .active {
-      background: #000;
-      color: #fff;
-      font-weight: 600;
-    }
-    .calendar-title {
-      font-size: 22px;
-      font-weight: 600;
-      padding: 4px 16px;
-    }
-    .calendar-subtitle {
-      font-size: 14px;
-      padding-left: 16px;
-      color: #999;
-    }
-    .month-footer {
-      display: flex;
-      justify-content: space-around;
-      font-size: 16px;
-      padding: 10px 0px;
-    }
-    .month-footer span {
-      color: #664;
-      cursor: pointer;
-      padding: 4px 12px;
-      border-radius: 16px;
-    }
-    .month-footer span.active {
-      background: #000;
-      color: #fff;
-    }
-    .month-footer span.current-month {
-      color: #005aff;
-      font-weight: 600;
-    }
-    #ec {
-      width: 100%;
-      height: calc(100vh - 200px);
-    }
-    .day-footer {
-      display: flex;
-      justify-content: space-around;
-      padding: 8px 0;
-      background: #fff;
-      font-size: 14px;
-    }
-    .day-footer .day-item {
-      flex: 1;
-      text-align: center;
-      cursor: pointer;
-      color: #664;
-    }
-    .day-footer .circle {
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      width: 56px;
-      height: 42px;
-      border-radius: 21px;
-      transition: background 0.2s, color 0.2s;
-    }
-    .day-footer .active .circle {
-      background: #000;
-      color: #fff;
-    }
-    .day-footer .day-name {
-      font-size: 11px;
-      line-height: 1;
-    }
-    .day-footer .day-number {
-      font-size: 15px;
-      font-weight: 600;
-      line-height: 1;
-    }
-    .day-footer .day-month {
-      font-size: 10px;
-      line-height: 1;
-      margin-top: 2px;
-    }
-  </style>
-</head>
-<body>
-  <header>
-    <div class="mode-switcher" id="modeSwitcher">
-      <span data-view="listWeek">List</span>
-      <span data-view="resourceTimeGridDay">Day</span>
-      <span data-view="resourceTimeGridWeek">Week</span>
-      <span data-view="dayGridMonth" class="active">Month</span>
-      <span data-view="resourceTimelineWeek">Planner</span>
-    </div>
-    <div class="calendar-title" id="calendarTitle">July 2025</div>
-    <div class="calendar-subtitle" id="calendarSubtitle"></div>
-  </header>
+    events.push({
+      id: row[0],
+      title: row[1],
+      start: row[2],
+      end: row[3],
+      calendarKey: row[4],
+      description: row[5]
+    });
+  }
 
-  <main>
-    <div id="ec"></div>
-  </main>
+  return createCorsOutput(events);
+}
 
-  <footer>
-    <div class="month-footer" id="monthFooter"></div>
-    <div class="day-footer" id="dayFooter" style="display: none;"></div>
-  </footer>
+function doPost(e) {
+  const log = [];
+  try {
+    log.push('--- START doPost ---');
+    log.push('e keys: ' + JSON.stringify(Object.keys(e || {})));
+    log.push('e.postData: ' + JSON.stringify(e.postData || {}));
 
-<script>
-  let touchStartX = 0;
-  let touchEndX = 0;
-  let lastClickedDate = null;
-  let lastTapTime = 0;
-
-  const GAS_URL = 'https://script.google.com/macros/s/AKfycbyG1oyqQd40BxF2a44cKzi9qDRHg1KnZSI-BXrJgrSRQypPaXZZ4T8jcu-QJr9LKipCaQ/exec';
-
-  const ec = EventCalendar.create(document.getElementById("ec"), {
-    view: "dayGridMonth",
-    firstDay: 1,
-    timeFormat: 'HH:mm',
-    headerToolbar: false,
-    height: "100%",
-    date: new Date().toISOString().slice(0, 10),
-    resources: [
-      { id: 1, title: "Наталья" },
-      { id: 2, title: "Ирина" },
-    ],
-    events: [], // загрузим ниже
-    nowIndicator: true,
-    selectable: true,
-    dayMaxEvents: true,
-    scrollTime: "08:00:00",
-    slotMinTime: "00:00:00",
-    slotMaxTime: "24:00:00",
-    slotLabelFormat: {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false
-    },
-    select: function(info) {
-      createEventPrompt(info);
-    },
-    eventClick: function(info) {
-      editEventPrompt(info.event);
+    let body = {};
+    if (e.postData && e.postData.contents) {
+      body = JSON.parse(e.postData.contents);
+      log.push('Parsed body: ' + JSON.stringify(body));
+    } else {
+      throw new Error("No POST data received");
     }
-  });
+
+    const action = body.action;
+    log.push('Action: ' + action);
+    if (!action) throw new Error("No action specified");
+
+    const ss = SpreadsheetApp.openById(SHEET_ID);
+    const sheet = ss.getSheetByName(SHEET_NAME);
+
+    if (action === 'create') {
+      log.push('--- CREATE ---');
+      const calendarKey = body.calendarKey || "master1";
+      const calendarId = CALENDAR_MAP[calendarKey];
+      log.push('calendarKey: ' + calendarKey);
+      log.push('calendarId: ' + calendarId);
+      if (!calendarId) throw new Error("Unknown calendar key: " + calendarKey);
+
+      const start = new Date(body.start);
+      const end = new Date(body.end);
+      log.push('Start: ' + start.toISOString());
+      log.push('End: ' + end.toISOString());
+
+      const eventResource = {
+        summary: body.title || "Без названия",
+        description: body.description || "",
+        start: {
+          dateTime: start.toISOString(),
+          timeZone: Session.getScriptTimeZone()
+        },
+        end: {
+          dateTime: end.toISOString(),
+          timeZone: Session.getScriptTimeZone()
+        }
+      };
+
+      const createdEvent = Calendar.Events.insert(eventResource, calendarId);
+      log.push('Created Event ID: ' + createdEvent.id);
+
+      sheet.appendRow([
+        createdEvent.id,
+        createdEvent.summary,
+        createdEvent.start.dateTime,
+        createdEvent.end.dateTime,
+        calendarKey,
+        createdEvent.description || ''
+      ]);
+
+      return createCorsOutput({ status: "created", id: createdEvent.id, log });
+    }
+
+    else if (action === 'update') {
+      log.push('--- UPDATE ---');
+      const id = body.id;
+      log.push('Update ID: ' + id);
+      if (!id) throw new Error("No event id specified for update");
+
+      const calendarKey = body.calendarKey || "master1";
+      const calendarId = CALENDAR_MAP[calendarKey];
+      log.push('calendarKey: ' + calendarKey);
+      log.push('calendarId: ' + calendarId);
+      if (!calendarId) throw new Error("Unknown calendar key: " + calendarKey);
+
+      const start = new Date(body.start);
+      const end = new Date(body.end);
+      log.push('Start: ' + start.toISOString());
+      log.push('End: ' + end.toISOString());
+
+      const eventResource = {
+        summary: body.title || "Без названия",
+        description: body.description || "",
+        start: {
+          dateTime: start.toISOString(),
+          timeZone: Session.getScriptTimeZone()
+        },
+        end: {
+          dateTime: end.toISOString(),
+          timeZone: Session.getScriptTimeZone()
+        }
+      };
+
+      const updatedEvent = Calendar.Events.update(eventResource, calendarId, id);
+      log.push('Updated Event ID: ' + updatedEvent.id);
+
+      const data = sheet.getDataRange().getValues();
+      let found = false;
+      for (let i = 1; i < data.length; i++) {
+        if (data[i][0] === id) {
+          const row = i + 1;
+          sheet.getRange(row, 2).setValue(updatedEvent.summary);
+          sheet.getRange(row, 3).setValue(updatedEvent.start.dateTime);
+          sheet.getRange(row, 4).setValue(updatedEvent.end.dateTime);
+          sheet.getRange(row, 5).setValue(calendarKey);
+          sheet.getRange(row, 6).setValue(updatedEvent.description || '');
+          found = true;
+          log.push('Row updated at: ' + row);
+          break;
+        }
+      }
+      if (!found) throw new Error("Event ID not found in sheet");
+
+      return createCorsOutput({ status: "updated", id, log });
+    }
+
+    else if (action === 'delete') {
+      log.push('--- DELETE ---');
+      const id = body.id;
+      log.push('Delete ID: ' + id);
+      if (!id) throw new Error("No event id specified for delete");
+
+      const data = sheet.getDataRange().getValues();
+      let foundRow = -1;
+      for (let i = 1; i < data.length; i++) {
+        if (data[i][0] === id) {
+          foundRow = i + 1;
+          break;
+        }
+      }
+      if (foundRow === -1) throw new Error("Event ID not found in sheet");
+
+      const calendarKey = data[foundRow - 1][4];
+      const calendarId = CALENDAR_MAP[calendarKey] || CALENDAR_MAP["master1"];
+      log.push('calendarKey: ' + calendarKey);
+      log.push('calendarId: ' + calendarId);
+
+      Calendar.Events.remove(calendarId, id);
+      log.push('Removed event from Calendar');
+
+      sheet.deleteRow(foundRow);
+      log.push('Deleted row from Sheet: ' + foundRow);
+
+      return createCorsOutput({ status: "deleted", id, log });
+    }
+
+    else {
+      throw new Error("Unknown action: " + action);
+    }
+
+  } catch (err) {
+    log.push('--- ERROR ---');
+    log.push(err.stack || err.toString());
+    return createCorsOutput({ status: "error", message: err.message || err.toString(), log });
+  }
+}
+
+function doOptions() {
+  return ContentService.createTextOutput('')
+    .setMimeType(ContentService.MimeType.TEXT)
+    .setHeader('Access-Control-Allow-Origin', '*')
+    .setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS')
+    .setHeader('Access-Control-Allow-Headers', 'Content-Type');
+}
+
+function createCorsOutput(obj) {
+  const output = ContentService.createTextOutput(JSON.stringify(obj));
+  output.setMimeType(ContentService.MimeType.JSON);
+  output.setHeader('Access-Control-Allow-Origin', '*');
+  output.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
+  output.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  return output;
+}
 
   async function loadEvents() {
     try {
