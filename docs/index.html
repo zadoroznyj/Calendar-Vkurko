@@ -1,27 +1,211 @@
-fetch('https://script.google.com/macros/s/ТВОЙ_ID/exec', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    action: 'create',
-    title: 'Test',
-    start: '2025-07-14T10:00:00',
-    end: '2025-07-14T11:00:00',
-    calendarKey: 'master1'
-  })
-}).then(r => r.json()).then(console.log).catch(console.error)
+const SHEET_ID = '1gW4ZD30gfiZqzT8e2ZATtfFljxHr2tiyMS6l_HEwFEs';
+const SHEET_NAME = 'Events';
 
+const CALENDAR_MAP = {
+  "master1": "irina.salon11@gmail.com",
+  "master2": "primary"
+};
 
+function doGet(e) {
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  const sheet = ss.getSheetByName(SHEET_NAME);
+  const data = sheet.getDataRange().getValues();
+  const events = [];
 
-Access to fetch at 'https://script.google.com/macros/s/%D0%A2%D0%92%D0%9E%D0%99_ID/exec' from origin 'https://zadoroznyj.github.io' has been blocked by CORS policy: Response to preflight request doesn't pass access control check: No 'Access-Control-Allow-Origin' header is present on the requested resource.Understand this error
-VM875:1  POST https://script.google.com/macros/s/%D0%A2%D0%92%D0%9E%D0%99_ID/exec net::ERR_FAILED
-(anonymous) @ VM875:1Understand this error
-TypeError: Failed to fetch
-    at <anonymous>:1:1
-Promise.catch
-(anonymous) @ VM875:11
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    if (!row[0]) continue;
 
+    events.push({
+      id: row[0],
+      title: row[1],
+      start: row[2],
+      end: row[3],
+      calendarKey: row[4],
+      description: row[5]
+    });
+  }
 
+  return ContentService.createTextOutput(JSON.stringify(events))
+    .setMimeType(ContentService.MimeType.JSON);
+}
 
+function doPost(e) {
+  const log = [];
+  const output = ContentService.createTextOutput();
+  output.setMimeType(ContentService.MimeType.JSON);
+
+  try {
+    log.push('START doPost');
+    log.push('e keys: ' + JSON.stringify(Object.keys(e)));
+    log.push('postData: ' + JSON.stringify(e.postData));
+
+    let body = {};
+    if (e.postData && e.postData.contents) {
+      body = JSON.parse(e.postData.contents);
+    } else {
+      throw new Error("No POST data received");
+    }
+
+    const action = body.action;
+    if (!action) throw new Error("No action specified");
+
+    const ss = SpreadsheetApp.openById(SHEET_ID);
+    const sheet = ss.getSheetByName(SHEET_NAME);
+
+    if (action === 'create') {
+      const calendarKey = body.calendarKey || "master1";
+      const calendarId = CALENDAR_MAP[calendarKey];
+      if (!calendarId) throw new Error("Unknown calendar key: " + calendarKey);
+
+      const start = new Date(body.start);
+      const end = new Date(body.end);
+
+      const eventResource = {
+        summary: body.title || "Без названия",
+        description: body.description || "",
+        start: {
+          dateTime: start.toISOString(),
+          timeZone: Session.getScriptTimeZone()
+        },
+        end: {
+          dateTime: end.toISOString(),
+          timeZone: Session.getScriptTimeZone()
+        }
+      };
+
+      const createdEvent = Calendar.Events.insert(eventResource, calendarId);
+
+      sheet.appendRow([
+        createdEvent.id,
+        createdEvent.summary,
+        createdEvent.start.dateTime,
+        createdEvent.end.dateTime,
+        calendarKey,
+        createdEvent.description || ''
+      ]);
+
+      const response = {
+        status: "created",
+        id: createdEvent.id,
+        log
+      };
+
+      return createCorsOutput(response);
+    }
+
+    else if (action === 'update') {
+      const id = body.id;
+      if (!id) throw new Error("No event id specified for update");
+
+      const calendarKey = body.calendarKey || "master1";
+      const calendarId = CALENDAR_MAP[calendarKey];
+      if (!calendarId) throw new Error("Unknown calendar key: " + calendarKey);
+
+      const start = new Date(body.start);
+      const end = new Date(body.end);
+
+      const eventResource = {
+        summary: body.title || "Без названия",
+        description: body.description || "",
+        start: {
+          dateTime: start.toISOString(),
+          timeZone: Session.getScriptTimeZone()
+        },
+        end: {
+          dateTime: end.toISOString(),
+          timeZone: Session.getScriptTimeZone()
+        }
+      };
+
+      const updatedEvent = Calendar.Events.update(eventResource, calendarId, id);
+
+      const data = sheet.getDataRange().getValues();
+      let found = false;
+      for (let i = 1; i < data.length; i++) {
+        if (data[i][0] === id) {
+          const row = i + 1;
+          sheet.getRange(row, 2).setValue(updatedEvent.summary);
+          sheet.getRange(row, 3).setValue(updatedEvent.start.dateTime);
+          sheet.getRange(row, 4).setValue(updatedEvent.end.dateTime);
+          sheet.getRange(row, 5).setValue(calendarKey);
+          sheet.getRange(row, 6).setValue(updatedEvent.description || '');
+          found = true;
+          break;
+        }
+      }
+      if (!found) throw new Error("Event ID not found in sheet");
+
+      const response = {
+        status: "updated",
+        id,
+        log
+      };
+
+      return createCorsOutput(response);
+    }
+
+    else if (action === 'delete') {
+      const id = body.id;
+      if (!id) throw new Error("No event id specified for delete");
+
+      const data = sheet.getDataRange().getValues();
+      let foundRow = -1;
+      for (let i = 1; i < data.length; i++) {
+        if (data[i][0] === id) {
+          foundRow = i + 1;
+          break;
+        }
+      }
+      if (foundRow === -1) throw new Error("Event ID not found in sheet");
+
+      sheet.deleteRow(foundRow);
+
+      const calendarKey = data[foundRow - 1][4];
+      const calendarId = CALENDAR_MAP[calendarKey] || CALENDAR_MAP["master1"];
+      Calendar.Events.remove(calendarId, id);
+
+      const response = {
+        status: "deleted",
+        id,
+        log
+      };
+
+      return createCorsOutput(response);
+    }
+
+    else {
+      throw new Error("Unknown action: " + action);
+    }
+
+  } catch (err) {
+    log.push('ERROR: ' + err.toString());
+    const response = {
+      status: "error",
+      message: err.message || err.toString(),
+      log
+    };
+    return createCorsOutput(response);
+  }
+}
+
+function doOptions(e) {
+  return HtmlService.createHtmlOutput('')
+    .appendUntrustedContent('')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+    .setContent('')
+    .addMetaTag('Access-Control-Allow-Origin', '*')
+    .addMetaTag('Access-Control-Allow-Methods', 'POST, GET, OPTIONS')
+    .addMetaTag('Access-Control-Allow-Headers', 'Content-Type');
+}
+
+// Универсальный CORS-выход
+function createCorsOutput(responseObject) {
+  const json = JSON.stringify(responseObject);
+  const output = ContentService.createTextOutput(json);
+  output.setMimeType(ContentService.MimeType.JSON);
+  return output;
+}
 
 
 <!DOCTYPE html>
