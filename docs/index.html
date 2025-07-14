@@ -1,3 +1,19 @@
+fetch('https://script.google.com/macros/s/ТВОЙ_ID/exec', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    action: 'create',
+    title: 'Test',
+    start: '2025-07-14T10:00:00',
+    end: '2025-07-14T11:00:00',
+    calendarKey: 'master1'
+  })
+}).then(r => r.json()).then(console.log).catch(console.error)
+
+
+
+
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
