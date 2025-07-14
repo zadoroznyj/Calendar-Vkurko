@@ -1,141 +1,184 @@
+const SHEET_ID = '1gW4ZD30gfiZqzT8e2ZATtfFljxHr2tiyMS6l_HEwFEs';
+const SHEET_NAME = 'Events';
+
+const CALENDAR_MAP = {
+  "master1": "irina.salon11@gmail.com",
+  "master2": "primary"
+};
+
+function doGet(e) {
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  const sheet = ss.getSheetByName(SHEET_NAME);
+  const data = sheet.getDataRange().getValues();
+  const events = [];
+
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    if (!row[0]) continue; // id
+
+    events.push({
+      id: row[0],
+      title: row[1],
+      start: row[2],
+      end: row[3],
+      calendarKey: row[4],
+      description: row[5]
+    });
+  }
+
+  return ContentService.createTextOutput(JSON.stringify(events))
+    .setMimeType(ContentService.MimeType.JSON)
+    .setHeader("Access-Control-Allow-Origin", "*");
+}
+
 function doPost(e) {
+  const output = ContentService.createTextOutput();
+  output.setMimeType(ContentService.MimeType.JSON);
+  output.setHeader("Access-Control-Allow-Origin", "*");
+
   try {
-    const data = e.parameter;
-
-    // Карта календарей
-    const calendarMap = {
-      "master1": "irina.salon11@gmail.com",
-      "master2": "primary"
-    };
-
-    // ID Google Таблицы
-    const sheetId = '1gW4ZD30gfiZqzT8e2ZATtfFljxHr2tiyMS6l_HEwFEs';
-
-    // Генерируем GroupID для пары событий
-    const groupId = new Date().getTime().toString();
-
-    // Выбираем календарь по полю "calendar", по умолчанию master1
-    const calendarKey = data.calendar || "irina.salon11@gmail.com";
-    const calendarId = calendarMap[calendarKey];
-
-    if (!calendarId) {
-      throw new Error("Unknown calendar key: " + calendarKey);
+    let body = {};
+    if (e.postData && e.postData.contents) {
+      body = JSON.parse(e.postData.contents);
+    } else if (e.parameter) {
+      body = e.parameter;
+    } else {
+      throw new Error("No POST data received");
     }
 
-    // Основное событие
-    const title = data.title || "Без названия";
-    const description = data.description || "";
-    const location = data.location || "";
-    const start = new Date(data.startTime);
-    const end = new Date(data.endTime);
+    const action = body.action;
+    if (!action) throw new Error("No action specified");
 
-    // Создание события через Advanced Calendar API без участников
-    const event = {
-      summary: title,
-      description: description,
-      location: location,
-      start: {
-        dateTime: start.toISOString(),
-        timeZone: Session.getScriptTimeZone()
-      },
-      end: {
-        dateTime: end.toISOString(),
-        timeZone: Session.getScriptTimeZone()
-      },
-      guestsCanInviteOthers: false,
-      guestsCanSeeOtherGuests: false
-    };
+    const ss = SpreadsheetApp.openById(SHEET_ID);
+    const sheet = ss.getSheetByName(SHEET_NAME);
 
-    // Создаём основное событие и получаем объект созданного
-    const createdEvent = Calendar.Events.insert(event, calendarId);
+    if (action === 'create') {
+      // Создание нового события
+      const calendarKey = body.calendarKey || "master1";
+      const calendarId = CALENDAR_MAP[calendarKey];
+      if (!calendarId) throw new Error("Unknown calendar key: " + calendarKey);
 
-    // Функция для записи события в таблицу через Sheets API с GroupID
-    function saveEventToSheet(eventObj, calendarKeyForRecord, groupIdForRecord) {
-      const values = [[
-        eventObj.id || '',
-        eventObj.summary || '',
-        eventObj.start.dateTime || '',
-        eventObj.end.dateTime || '',
-        calendarKeyForRecord || '',
-        eventObj.description || '',
-        groupIdForRecord || ''
-      ]];
+      const start = new Date(body.start);
+      const end = new Date(body.end);
 
-      const resource = {
-        values: values
-      };
-
-      Sheets.Spreadsheets.Values.append(resource, sheetId, 'Events!A:G', {
-        valueInputOption: 'RAW',
-        insertDataOption: 'INSERT_ROWS'
-      });
-    }
-
-    // Записываем основное событие в таблицу с GroupID
-    saveEventToSheet(createdEvent, calendarKey, groupId);
-
-    // Проверяем HELP в additionalNotes или description
-    const helpSource = data.additionalNotes || description || '';
-    const helpMatch = helpSource.match(/HELP\s*\(\s*([^)]+?)\s*\)\s*(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})/i);
-
-    if (helpMatch) {
-      const helpService = helpMatch[1];
-      const helpStart = helpMatch[2];
-      const helpEnd = helpMatch[3];
-
-      const otherKey = (calendarKey === "master1") ? "master2" : "master1";
-      const otherCalendarId = calendarMap[otherKey];
-
-      const baseDate = new Date(start);
-      const year = baseDate.getFullYear();
-      const month = baseDate.getMonth();
-      const day = baseDate.getDate();
-
-      const [startH, startM] = helpStart.split(':').map(Number);
-      const [endH, endM] = helpEnd.split(':').map(Number);
-
-      const helpStartDate = new Date(year, month, day, startH, startM);
-      const helpEndDate = new Date(year, month, day, endH, endM);
-
-      const clientName = title.replace(/^(Стрижка|Покраска|Наращивание|Другое)\s*[:\-]?\s*/i, '').trim();
-      const helpTitle = `${helpService}: ${clientName} (Передано Натльей)`;
-
-      const helpEvent = {
-        summary: helpTitle,
-        description: description,
-        location: location,
+      const eventResource = {
+        summary: body.title || "Без названия",
+        description: body.description || "",
         start: {
-          dateTime: helpStartDate.toISOString(),
+          dateTime: start.toISOString(),
           timeZone: Session.getScriptTimeZone()
         },
         end: {
-          dateTime: helpEndDate.toISOString(),
+          dateTime: end.toISOString(),
           timeZone: Session.getScriptTimeZone()
-        },
-        attendees: [],
-        guestsCanInviteOthers: false,
-        guestsCanSeeOtherGuests: false
+        }
       };
 
-      // Создаём вспомогательное событие и получаем объект
-      const createdHelpEvent = Calendar.Events.insert(helpEvent, otherCalendarId);
+      // Создаём событие в календаре
+      const createdEvent = Calendar.Events.insert(eventResource, calendarId);
 
-      // Записываем вспомогательное событие в таблицу с тем же GroupID
-      saveEventToSheet(createdHelpEvent, otherKey, groupId);
+      // Записываем в таблицу
+      sheet.appendRow([
+        createdEvent.id,
+        createdEvent.summary,
+        createdEvent.start.dateTime,
+        createdEvent.end.dateTime,
+        calendarKey,
+        createdEvent.description || ''
+      ]);
+
+      output.setContent(JSON.stringify({ status: "created", id: createdEvent.id }));
+      return output;
+
+    } else if (action === 'update') {
+      const id = body.id;
+      if (!id) throw new Error("No event id specified for update");
+
+      const calendarKey = body.calendarKey || "master1";
+      const calendarId = CALENDAR_MAP[calendarKey];
+      if (!calendarId) throw new Error("Unknown calendar key: " + calendarKey);
+
+      const start = new Date(body.start);
+      const end = new Date(body.end);
+
+      // Обновляем событие в календаре
+      const eventResource = {
+        summary: body.title || "Без названия",
+        description: body.description || "",
+        start: {
+          dateTime: start.toISOString(),
+          timeZone: Session.getScriptTimeZone()
+        },
+        end: {
+          dateTime: end.toISOString(),
+          timeZone: Session.getScriptTimeZone()
+        }
+      };
+
+      const updatedEvent = Calendar.Events.update(eventResource, calendarId, id);
+
+      // Обновляем в таблице
+      const data = sheet.getDataRange().getValues();
+      let found = false;
+      for (let i = 1; i < data.length; i++) {
+        if (data[i][0] === id) {
+          const row = i + 1;
+          sheet.getRange(row, 2).setValue(updatedEvent.summary);
+          sheet.getRange(row, 3).setValue(updatedEvent.start.dateTime);
+          sheet.getRange(row, 4).setValue(updatedEvent.end.dateTime);
+          sheet.getRange(row, 5).setValue(calendarKey);
+          sheet.getRange(row, 6).setValue(updatedEvent.description || '');
+          found = true;
+          break;
+        }
+      }
+      if (!found) throw new Error("Event ID not found in sheet");
+
+      output.setContent(JSON.stringify({ status: "updated", id: id }));
+      return output;
+
+    } else if (action === 'delete') {
+      const id = body.id;
+      if (!id) throw new Error("No event id specified for delete");
+
+      // Найдём событие в таблице и удалим
+      const data = sheet.getDataRange().getValues();
+      let foundRow = -1;
+      for (let i = 1; i < data.length; i++) {
+        if (data[i][0] === id) {
+          foundRow = i + 1;
+          break;
+        }
+      }
+      if (foundRow === -1) throw new Error("Event ID not found in sheet");
+
+      sheet.deleteRow(foundRow);
+
+      // Удаляем событие из календаря
+      let calendarKey = data[foundRow - 1][4];
+      let calendarId = CALENDAR_MAP[calendarKey] || CALENDAR_MAP["master1"];
+      Calendar.Events.remove(calendarId, id);
+
+      output.setContent(JSON.stringify({ status: "deleted", id: id }));
+      return output;
+
+    } else {
+      throw new Error("Unknown action: " + action);
     }
 
-    return ContentService.createTextOutput(JSON.stringify({
-      status: "ok",
-      calendar: calendarId,
-      created: { title: title, start: start, end: end }
-    })).setMimeType(ContentService.MimeType.JSON);
-
   } catch (err) {
-    return ContentService.createTextOutput(JSON.stringify({
-      status: "error",
-      message: err.toString()
-    })).setMimeType(ContentService.MimeType.JSON);
+    output.setContent(JSON.stringify({ status: "error", message: err.message || err.toString() }));
+    return output;
   }
+}
+
+// Обработка CORS preflight (OPTIONS запрос)
+function doOptions() {
+  return ContentService.createTextOutput('')
+    .setMimeType(ContentService.MimeType.TEXT)
+    .setHeader("Access-Control-Allow-Origin", "*")
+    .setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+    .setHeader("Access-Control-Allow-Headers", "Content-Type");
 }
 
 
