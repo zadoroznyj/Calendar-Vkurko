@@ -1,105 +1,145 @@
-Access to fetch at 'https://script.google.com/macros/s/AKfycbwGxMy_ZlJkOCOmKk4PfDHFEuSCDkUaSyWfWxN3bfgtPrUjD_FoSxkfKdfWbJ6X5eM0NA/exec' from origin 'https://zadoroznyj.github.io' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.Understand this error
-Calendar-Vkurko/:178  GET https://script.google.com/macros/s/AKfycbwGxMy_ZlJkOCOmKk4PfDHFEuSCDkUaSyWfWxN3bfgtPrUjD_FoSxkfKdfWbJ6X5eM0NA/exec net::ERR_FAILED 200 (OK)
-loadEvents @ Calendar-Vkurko/:178
-(anonymous) @ Calendar-Vkurko/:443Understand this error
-Calendar-Vkurko/:184 Ошибка загрузки событий: TypeError: Failed to fetch
-    at loadEvents (Calendar-Vkurko/:178:30)
-    at Calendar-Vkurko/:443:3
-loadEvents @ Calendar-Vkurko/:184
-await in loadEvents
-(anonymous) @ Calendar-Vkurko/:443Understand this error
+function doPost(e) {
+  try {
+    const data = e.parameter;
 
+    // Карта календарей
+    const calendarMap = {
+      "master1": "irina.salon11@gmail.com",
+      "master2": "primary"
+    };
 
+    // ID Google Таблицы
+    const sheetId = '1gW4ZD30gfiZqzT8e2ZATtfFljxHr2tiyMS6l_HEwFEs';
 
+    // Генерируем GroupID для пары событий
+    const groupId = new Date().getTime().toString();
 
+    // Выбираем календарь по полю "calendar", по умолчанию master1
+    const calendarKey = data.calendar || "irina.salon11@gmail.com";
+    const calendarId = calendarMap[calendarKey];
 
+    if (!calendarId) {
+      throw new Error("Unknown calendar key: " + calendarKey);
+    }
 
+    // Основное событие
+    const title = data.title || "Без названия";
+    const description = data.description || "";
+    const location = data.location || "";
+    const start = new Date(data.startTime);
+    const end = new Date(data.endTime);
 
+    // Создание события через Advanced Calendar API без участников
+    const event = {
+      summary: title,
+      description: description,
+      location: location,
+      start: {
+        dateTime: start.toISOString(),
+        timeZone: Session.getScriptTimeZone()
+      },
+      end: {
+        dateTime: end.toISOString(),
+        timeZone: Session.getScriptTimeZone()
+      },
+      guestsCanInviteOthers: false,
+      guestsCanSeeOtherGuests: false
+    };
 
+    // Создаём основное событие и получаем объект созданного
+    const createdEvent = Calendar.Events.insert(event, calendarId);
 
-Request URL
-https://script.google.com/macros/s/AKfycbwGxMy_ZlJkOCOmKk4PfDHFEuSCDkUaSyWfWxN3bfgtPrUjD_FoSxkfKdfWbJ6X5eM0NA/exec
-Request Method
-GET
-Status Code
-200 OK
-Referrer Policy
-strict-origin-when-cross-origin
-alt-svc
-h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
-cache-control
-no-cache, no-store, max-age=0, must-revalidate
-content-encoding
-gzip
-content-security-policy
-script-src 'report-sample' 'nonce-NzTIx8e6wUnUQOWHeMhekA' 'unsafe-inline' 'unsafe-eval' 'strict-dynamic' https: http:;object-src 'none';base-uri 'self';report-uri /cspreport
-content-type
-text/html; charset=utf-8
-date
-Mon, 14 Jul 2025 01:22:46 GMT
-expires
-Mon, 01 Jan 1990 00:00:00 GMT
-pragma
-no-cache
-referrer-policy
-strict-origin-when-cross-origin
-server
-GSE
-x-content-type-options
-nosniff
-x-xss-protection
-1; mode=block
-:authority
-script.google.com
-:method
-GET
-:path
-/macros/s/AKfycbwGxMy_ZlJkOCOmKk4PfDHFEuSCDkUaSyWfWxN3bfgtPrUjD_FoSxkfKdfWbJ6X5eM0NA/exec
-:scheme
-https
-accept
-*/*
-accept-encoding
-gzip, deflate, br, zstd
-accept-language
-en-US,en;q=0.9,lt;q=0.8,nl;q=0.7
-origin
-https://zadoroznyj.github.io
-priority
-u=1, i
-referer
-https://zadoroznyj.github.io/
-sec-ch-ua
-"Not)A;Brand";v="8", "Chromium";v="138", "Google Chrome";v="138"
-sec-ch-ua-mobile
-?0
-sec-ch-ua-platform
-"Windows"
-sec-fetch-dest
-empty
-sec-fetch-mode
-cors
-sec-fetch-site
-cross-site
-user-agent
-Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36
-x-browser-channel
-stable
-x-browser-copyright
-Copyright 2025 Google LLC. All rights reserved.
-x-browser-validation
-6h3XF8YcD8syi2FF2BbuE2KllQo=
-x-browser-year
-2025
-x-client-data
-CI62yQEIorbJAQipncoBCNqCywEIlKHLAQiko8sBCIWgzQEI4vDOARiF+M4B
-Decoded:
-message ClientVariations {
-  // Active Google-visible variation IDs on this client. These are reported for analysis, but do not directly affect any server-side behavior.
-  repeated int32 variation_id = [3300110, 3300130, 3313321, 3326298, 3330196, 3330468, 3362821, 3389538];
-  // Active Google-visible variation IDs on this client that trigger server-side behavior. These are reported for analysis *and* directly affect server-side behavior.
-  repeated int32 trigger_variation_id = [3390469];
+    // Функция для записи события в таблицу через Sheets API с GroupID
+    function saveEventToSheet(eventObj, calendarKeyForRecord, groupIdForRecord) {
+      const values = [[
+        eventObj.id || '',
+        eventObj.summary || '',
+        eventObj.start.dateTime || '',
+        eventObj.end.dateTime || '',
+        calendarKeyForRecord || '',
+        eventObj.description || '',
+        groupIdForRecord || ''
+      ]];
+
+      const resource = {
+        values: values
+      };
+
+      Sheets.Spreadsheets.Values.append(resource, sheetId, 'Events!A:G', {
+        valueInputOption: 'RAW',
+        insertDataOption: 'INSERT_ROWS'
+      });
+    }
+
+    // Записываем основное событие в таблицу с GroupID
+    saveEventToSheet(createdEvent, calendarKey, groupId);
+
+    // Проверяем HELP в additionalNotes или description
+    const helpSource = data.additionalNotes || description || '';
+    const helpMatch = helpSource.match(/HELP\s*\(\s*([^)]+?)\s*\)\s*(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})/i);
+
+    if (helpMatch) {
+      const helpService = helpMatch[1];
+      const helpStart = helpMatch[2];
+      const helpEnd = helpMatch[3];
+
+      const otherKey = (calendarKey === "master1") ? "master2" : "master1";
+      const otherCalendarId = calendarMap[otherKey];
+
+      const baseDate = new Date(start);
+      const year = baseDate.getFullYear();
+      const month = baseDate.getMonth();
+      const day = baseDate.getDate();
+
+      const [startH, startM] = helpStart.split(':').map(Number);
+      const [endH, endM] = helpEnd.split(':').map(Number);
+
+      const helpStartDate = new Date(year, month, day, startH, startM);
+      const helpEndDate = new Date(year, month, day, endH, endM);
+
+      const clientName = title.replace(/^(Стрижка|Покраска|Наращивание|Другое)\s*[:\-]?\s*/i, '').trim();
+      const helpTitle = `${helpService}: ${clientName} (Передано Натльей)`;
+
+      const helpEvent = {
+        summary: helpTitle,
+        description: description,
+        location: location,
+        start: {
+          dateTime: helpStartDate.toISOString(),
+          timeZone: Session.getScriptTimeZone()
+        },
+        end: {
+          dateTime: helpEndDate.toISOString(),
+          timeZone: Session.getScriptTimeZone()
+        },
+        attendees: [],
+        guestsCanInviteOthers: false,
+        guestsCanSeeOtherGuests: false
+      };
+
+      // Создаём вспомогательное событие и получаем объект
+      const createdHelpEvent = Calendar.Events.insert(helpEvent, otherCalendarId);
+
+      // Записываем вспомогательное событие в таблицу с тем же GroupID
+      saveEventToSheet(createdHelpEvent, otherKey, groupId);
+    }
+
+    return ContentService.createTextOutput(JSON.stringify({
+      status: "ok",
+      calendar: calendarId,
+      created: { title: title, start: start, end: end }
+    })).setMimeType(ContentService.MimeType.JSON);
+
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({
+      status: "error",
+      message: err.toString()
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
 }
+
+
+
 
 
 
