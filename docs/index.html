@@ -356,8 +356,8 @@
       action: "update",
       id: event.id,
       title: newTitle,
-      startTime: event.start.toISOString(),
-      endTime: event.end ? event.end.toISOString() : ""
+      startTime: event.start.toISOString().replace("Z",""),
+      endTime: event.end ? event.end.toISOString().replace("Z","") : ""
     });
 
     fetch(GAS_URL, {
@@ -470,11 +470,9 @@
       div.dataset.date = iso;
       div.innerHTML = `
         <div class="circle">
-                   <div class="circle">
             <div class="day-name">${dow}</div>
             <div class="day-number">${day}</div>
             ${isActive ? `<div class="day-month">${month}</div>` : ""}
-          </div>
         </div>
       `;
       footer.appendChild(div);
