@@ -1,69 +1,133 @@
-Calendar-Vkurko/:1 Access to fetch at 'https://script.google.com/macros/s/AKfycbw27rW4x36KehtaPraeail2z8mj_zNodUVRsZFFcViw5Fy45USfxAXb-naHp4j1lAJY/exec' from origin 'https://zadoroznyj.github.io' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.
+const CALENDAR_MAP = {
+  1: 'irina.salon11@gmail.com',
+  2: 'primary'
+};
 
-Calendar-Vkurko/:181 
- POST https://script.google.com/macros/s/AKfycbw27rW4x36KehtaPraeail2z8mj_zNodUVRsZFFcViw5Fy45USfxAXb-naHp4j1lAJY/exec net::ERR_FAILED 200 (OK)
-loadEvents	@	Calendar-Vkurko/:181
-(anonymous)	@	Calendar-Vkurko/:448
-Calendar-Vkurko/:191 Ошибка загрузки событий: TypeError: Failed to fetch
-    at loadEvents (Calendar-Vkurko/:181:30)
-    at Calendar-Vkurko/:448:3
-loadEvents	@	Calendar-Vkurko/:191
-await in loadEvents		
-(anonymous)	@	Calendar-Vkurko/:448
+function parseFormData(form) {
+  const result = {};
+  const pairs = form.split("&");
+  for (const pair of pairs) {
+    const [key, value] = pair.split("=");
+    result[decodeURIComponent(key)] = decodeURIComponent(value || "");
+  }
+  return result;
+}
 
+function setCorsHeaders(output) {
+  return output
+    .setMimeType(ContentService.MimeType.JSON)
+    .setHeader("Access-Control-Allow-Origin", "*")
+    .setHeader("Access-Control-Allow-Methods", "POST, OPTIONS")
+    .setHeader("Access-Control-Allow-Headers", "Content-Type");
+}
 
+function doPost(e) {
+  Logger.log("=== doPost triggered ===");
+  Logger.log("Event object: %s", JSON.stringify(e));
 
-Ошибка загрузки событий: Failed to fetch
+  if (!e || !e.postData || !e.postData.contents) {
+    Logger.log("No postData found");
+    const output = ContentService.createTextOutput(JSON.stringify({
+      status: "error",
+      message: "No postData"
+    }));
+    return setCorsHeaders(output);
+  }
 
+  const data = parseFormData(e.postData.contents);
+  Logger.log("Parsed data: %s", JSON.stringify(data));
 
+  const action = data.action;
 
+  try {
+    if (action === 'get') {
+      const allEvents = [];
+      for (const [resId, calendarId] of Object.entries(CALENDAR_MAP)) {
+        const cal = CalendarApp.getCalendarById(calendarId);
+        const events = cal.getEvents(new Date('2025-01-01'), new Date('2026-01-01'));
+        for (const ev of events) {
+          allEvents.push({
+            id: ev.getId(),
+            title: ev.getTitle(),
+            start: ev.getStartTime().toISOString(),
+            end: ev.getEndTime().toISOString(),
+            resourceId: parseInt(resId),
+            allDay: false,
+            color: '#3788d8',
+            extendedProps: {
+              calendarKey: resId == 1 ? 'master1' : 'master2'
+            }
+          });
+        }
+      }
+      Logger.log("Returning %d events", allEvents.length);
+      const output = ContentService.createTextOutput(JSON.stringify(allEvents));
+      return setCorsHeaders(output);
+    }
 
-TypeError: output.setMimeType(...).setHeader is not a function (line 19, file "Code")
+    if (action === 'create') {
+      const calendarId = CALENDAR_MAP[data.resourceId];
+      const cal = CalendarApp.getCalendarById(calendarId);
+      const event = cal.createEvent(data.title, new Date(data.start), new Date(data.end));
+      Logger.log("Created event: %s", event.getId());
+      return setCorsHeaders(ContentService.createTextOutput(JSON.stringify({
+        status: "created",
+        id: event.getId()
+      })));
+    }
 
+    if (action === 'update') {
+      const calendarId = CALENDAR_MAP[data.resourceId];
+      const cal = CalendarApp.getCalendarById(calendarId);
+      const event = cal.getEventById(data.id);
+      if (!event) throw new Error("Event not found");
+      event.setTitle(data.title);
+      event.setTime(new Date(data.start), new Date(data.end));
+      Logger.log("Updated event: %s", data.id);
+      return setCorsHeaders(ContentService.createTextOutput(JSON.stringify({
+        status: "updated",
+        id: data.id
+      })));
+    }
 
+    if (action === 'delete') {
+      for (const calendarId of Object.values(CALENDAR_MAP)) {
+        const cal = CalendarApp.getCalendarById(calendarId);
+        const event = cal.getEventById(data.id);
+        if (event) {
+          event.deleteEvent();
+          Logger.log("Deleted event: %s", data.id);
+          return setCorsHeaders(ContentService.createTextOutput(JSON.stringify({
+            status: "deleted",
+            id: data.id
+          })));
+        }
+      }
+      throw new Error("Event not found for deletion");
+    }
 
+    throw new Error("Unknown action: " + action);
 
+  } catch (err) {
+    Logger.log("ERROR: %s", err.stack);
+    return setCorsHeaders(ContentService.createTextOutput(JSON.stringify({
+      status: "error",
+      message: err.message
+    })));
+  }
+}
 
-Notice	Execution started
-8:12:00 PM	Info	=== doPost triggered ===
-8:12:00 PM	Info	Event object: undefined
-8:12:00 PM	Info	No postData found
-8:12:00 PM	Error	
-TypeError: output.setMimeType(...).setHeader is not a function
-setCorsHeaders	@ Code.gs:19
-doPost	@ Code.gs:41
+function doGet() {
+  Logger.log("=== doGet triggered ===");
+  return ContentService.createTextOutput(JSON.stringify({
+    status: "ok"
+  }))
+    .setMimeType(ContentService.MimeType.JSON);
+}
 
-
-
-
-
-
-Notice	Execution started
-8:11:34 PM	Info	=== doGet triggered ===
-8:11:35 PM	Error	
-TypeError: output.setMimeType(...).setHeader is not a function
-setCorsHeaders	@ Code.gs:19
-doGet	@ Code.gs:28
-
-
-
-
-
-Notice	Execution started
-8:11:16 PM	Error	
-TypeError: Cannot read properties of undefined (reading 'setMimeType')
-setCorsHeaders	@ Code.gs:18
-
-
-
-
-
-
-8:10:44 PM	Notice	Execution started
-8:10:45 PM	Error	
-TypeError: Cannot read properties of undefined (reading 'split')
-parseFormData	@ Code.gs:7
-
+function doOptions(e) {
+  return setCorsHeaders(ContentService.createTextOutput(""));
+}
 
 
 
