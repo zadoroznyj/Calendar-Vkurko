@@ -1,3 +1,169 @@
+const CALENDAR_MAP = {
+  1: 'irina.salon11@gmail.com',
+  2: 'primary'
+};
+
+// Парсит body с "application/x-www-form-urlencoded"
+function parseFormData(form) {
+  const result = {};
+  if (!form) return result;
+  form.split("&").forEach(p => {
+    const [k, v] = p.split("=");
+    result[decodeURIComponent(k)] = decodeURIComponent(v || "");
+  });
+  return result;
+}
+
+// Устанавливаем CORS заголовки для ответа
+function setCors(output) {
+  output
+    .appendHeader("Access-Control-Allow-Origin", "*")
+    .appendHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+    .appendHeader("Access-Control-Allow-Headers", "Content-Type");
+  return output;
+}
+
+// Обработка preflight OPTIONS-запроса
+function doOptions(e) {
+  const out = ContentService.createTextOutput("");
+  return setCors(out);
+}
+
+// Простой doGet — возвращает статус ok + CORS
+function doGet(e) {
+  Logger.log("doGet triggered");
+  const out = ContentService
+    .createTextOutput(JSON.stringify({ status: "ok" }))
+    .setMimeType(ContentService.MimeType.JSON);
+  return setCors(out);
+}
+
+// Главная функция doPost
+function doPost(e) {
+  Logger.log("doPost triggered");
+  Logger.log("Raw event object: " + JSON.stringify(e));
+
+  if (!e || !e.postData || !e.postData.contents) {
+    Logger.log("No postData found");
+    const out = ContentService
+      .createTextOutput(JSON.stringify({ status: "error", message: "No postData" }))
+      .setMimeType(ContentService.MimeType.JSON);
+    return setCors(out);
+  }
+
+  const data = parseFormData(e.postData.contents);
+  Logger.log("Parsed data: " + JSON.stringify(data));
+
+  try {
+    const action = data.action;
+    if (!action) throw new Error("No action specified");
+
+    if (action === "get") {
+      let allEvents = [];
+      for (const [rid, calId] of Object.entries(CALENDAR_MAP)) {
+        const calendar = CalendarApp.getCalendarById(calId);
+        if (!calendar) {
+          Logger.log(`Calendar not found for id: ${calId}`);
+          continue;
+        }
+        const events = calendar.getEvents(new Date('2025-01-01T00:00:00Z'), new Date('2026-01-01T00:00:00Z'));
+        for (const ev of events) {
+          allEvents.push({
+            id: ev.getId(),
+            title: ev.getTitle(),
+            start: ev.getStartTime().toISOString(),
+            end: ev.getEndTime().toISOString(),
+            resourceId: +rid,
+            allDay: ev.isAllDayEvent(),
+            color: '#3788d8',
+            extendedProps: {
+              calendarKey: rid == 1 ? 'master1' : 'master2'
+            }
+          });
+        }
+      }
+      const out = ContentService
+        .createTextOutput(JSON.stringify(allEvents))
+        .setMimeType(ContentService.MimeType.JSON);
+      return setCors(out);
+    }
+
+    if (action === "create") {
+      const calendarId = CALENDAR_MAP[data.resourceId];
+      if (!calendarId) throw new Error("Invalid resourceId");
+      const calendar = CalendarApp.getCalendarById(calendarId);
+      if (!calendar) throw new Error("Calendar not found");
+
+      // Внимание: дата приходит в ISO формате, конвертируем в Date
+      const startDate = new Date(data.start);
+      const endDate = new Date(data.end);
+      const title = data.title || "Без названия";
+
+      const event = calendar.createEvent(title, startDate, endDate);
+      const out = ContentService
+        .createTextOutput(JSON.stringify({ status: "created", id: event.getId() }))
+        .setMimeType(ContentService.MimeType.JSON);
+      return setCors(out);
+    }
+
+    if (action === "update") {
+      const calendarId = CALENDAR_MAP[data.resourceId];
+      if (!calendarId) throw new Error("Invalid resourceId");
+      const calendar = CalendarApp.getCalendarById(calendarId);
+      if (!calendar) throw new Error("Calendar not found");
+
+      const event = calendar.getEventById(data.id);
+      if (!event) throw new Error("Event not found");
+
+      if (data.title) event.setTitle(data.title);
+      if (data.start && data.end) {
+        event.setTime(new Date(data.start), new Date(data.end));
+      }
+
+      const out = ContentService
+        .createTextOutput(JSON.stringify({ status: "updated", id: data.id }))
+        .setMimeType(ContentService.MimeType.JSON);
+      return setCors(out);
+    }
+
+    if (action === "delete") {
+      // Удаляем из любого календаря где найдется
+      let deleted = false;
+      for (const calendarId of Object.values(CALENDAR_MAP)) {
+        const calendar = CalendarApp.getCalendarById(calendarId);
+        if (!calendar) continue;
+        const event = calendar.getEventById(data.id);
+        if (event) {
+          event.deleteEvent();
+          deleted = true;
+          break;
+        }
+      }
+      if (deleted) {
+        const out = ContentService
+          .createTextOutput(JSON.stringify({ status: "deleted", id: data.id }))
+          .setMimeType(ContentService.MimeType.JSON);
+        return setCors(out);
+      } else {
+        throw new Error("Event not found");
+      }
+    }
+
+    throw new Error("Unknown action: " + action);
+  } catch (err) {
+    Logger.log("Error: " + err.message);
+    const out = ContentService
+      .createTextOutput(JSON.stringify({ status: "error", message: err.message }))
+      .setMimeType(ContentService.MimeType.JSON);
+    return setCors(out);
+  }
+}
+
+
+
+
+
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
