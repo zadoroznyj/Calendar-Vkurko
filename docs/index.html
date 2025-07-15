@@ -26,8 +26,10 @@ function doPost(e) {
       const calendar = CalendarApp.getCalendarById(calendarId);
       if (!calendar) throw new Error("Calendar not found: " + calendarId);
 
-      const fromDate = new Date('2025-01-01');
-      const toDate = new Date('2026-01-01');
+      // Используем параметры start и end, если они есть, иначе дефолтные даты
+      const fromDate = data.start ? new Date(data.start) : new Date('2025-01-01');
+      const toDate = data.end ? new Date(data.end) : new Date('2026-01-01');
+
       const events = calendar.getEvents(fromDate, toDate).map(ev => ({
         id: ev.getId(),
         title: ev.getTitle(),
@@ -109,7 +111,6 @@ function doPost(e) {
       .setMimeType(ContentService.MimeType.JSON);
   }
 }
-
 
 
 
