@@ -1,13 +1,18 @@
-Calendar-Vkurko/:334 Ошибка отправки update: TypeError: event.setProp is not a function
-    at Calendar-Vkurko/:328:15
-(anonymous)	@	Calendar-Vkurko/:334
-Promise.catch		
-editEventPrompt	@	Calendar-Vkurko/:333
-eventClick	@	Calendar-Vkurko/:174
-(anonymous)	@	index.iife.js:12
-Ao.Te.__click	@	index.iife.js:12
-mr	@	index.iife.js:12
+if (data.status === "updated") {
+  event.setProp("title", newTitle);
+} else {
+  alert("Ошибка обновления события: " + (data.message || "неизвестная ошибка"));
+}
 
+
+
+
+
+if (data.status === "updated") {
+  loadEvents(); // перезагрузим события после редактирования
+} else {
+  alert("Ошибка обновления события: " + (data.message || "неизвестная ошибка"));
+}
 
 
 
