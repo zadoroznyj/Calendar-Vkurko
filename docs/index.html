@@ -325,7 +325,7 @@
     .then(res => res.json())
     .then(data => {
       if (data.status === "updated") {
-        event.setProp("title", newTitle);
+        loadEvents();
       } else {
         alert("Ошибка обновления события: " + (data.message || "неизвестная ошибка"));
       }
