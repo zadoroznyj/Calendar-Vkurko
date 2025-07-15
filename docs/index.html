@@ -1,91 +1,144 @@
-8:22:03 PM	Notice	Execution started
-8:22:03 PM	Error	
-TypeError: output.setMimeType(...).setHeader is not a function
-setCorsHeaders	@ Code.gs:19
-doOptions	@ Code.gs:129
+const CALENDAR_MAP = {
+  1: 'irina.salon11@gmail.com',
+  2: 'primary'
+};
 
+function parseFormData(form) {
+  const result = {};
+  form.split("&").forEach(pair => {
+    const [key, value] = pair.split("=");
+    result[decodeURIComponent(key)] = decodeURIComponent(value || "");
+  });
+  return result;
+}
 
+function setCors(output) {
+  output.appendHeader("Access-Control-Allow-Origin", "*")
+        .appendHeader("Access-Control-Allow-Methods", "POST, OPTIONS")
+        .appendHeader("Access-Control-Allow-Headers", "Content-Type");
+  return output;
+}
 
+function doOptions(e) {
+  const output = ContentService.createTextOutput("");
+  return setCors(output);
+}
 
+function doGet(e) {
+  Logger.log("=== doGet triggered ===");
+  Logger.log("Event object: " + JSON.stringify(e));
+  const output = ContentService.createTextOutput(JSON.stringify({ status: 'ok' }))
+    .setMimeType(ContentService.MimeType.JSON);
+  return setCors(output);
+}
 
+function doPost(e) {
+  Logger.log("=== doPost triggered ===");
+  Logger.log("Event object: " + JSON.stringify(e));
 
-Execution log
-8:21:45 PM	Notice	Execution started
-8:21:45 PM	Info	=== doGet triggered ===
-8:21:45 PM	Notice	Execution completed
+  if (!e || !e.postData || !e.postData.contents) {
+    Logger.log("No postData found");
+    const output = ContentService.createTextOutput(JSON.stringify({
+      status: 'error',
+      message: 'No postData'
+    })).setMimeType(ContentService.MimeType.JSON);
+    return setCors(output);
+  }
 
+  const data = parseFormData(e.postData.contents);
+  Logger.log("Parsed form data: " + JSON.stringify(data));
 
+  try {
+    const action = data.action;
 
+    if (action === 'get') {
+      const allEvents = [];
 
+      for (const [resId, calendarId] of Object.entries(CALENDAR_MAP)) {
+        const cal = CalendarApp.getCalendarById(calendarId);
+        const events = cal.getEvents(new Date('2025-01-01'), new Date('2026-01-01'));
 
-Execution log
-8:21:26 PM	Notice	Execution started
-8:21:26 PM	Info	=== doPost triggered ===
-8:21:26 PM	Info	Event object: null
-8:21:26 PM	Info	No postData found
-8:21:26 PM	Error	
-TypeError: output.setMimeType(...).setHeader is not a function
-setCorsHeaders	@ Code.gs:19
-doPost	@ Code.gs:34
+        for (const ev of events) {
+          allEvents.push({
+            id: ev.getId(),
+            title: ev.getTitle(),
+            start: ev.getStartTime().toISOString(),
+            end: ev.getEndTime().toISOString(),
+            resourceId: parseInt(resId),
+            allDay: false,
+            color: '#3788d8',
+            extendedProps: {
+              calendarKey: resId == 1 ? 'master1' : 'master2'
+            }
+          });
+        }
+      }
 
+      const output = ContentService.createTextOutput(JSON.stringify(allEvents))
+        .setMimeType(ContentService.MimeType.JSON);
+      return setCors(output);
+    }
 
+    if (action === 'create') {
+      const calendarId = CALENDAR_MAP[data.resourceId];
+      const cal = CalendarApp.getCalendarById(calendarId);
+      const event = cal.createEvent(data.title, new Date(data.start), new Date(data.end));
 
+      const output = ContentService.createTextOutput(JSON.stringify({
+        status: 'created',
+        id: event.getId()
+      })).setMimeType(ContentService.MimeType.JSON);
+      return setCors(output);
+    }
 
-Execution log
-8:21:07 PM	Notice	Execution started
-8:21:07 PM	Error	
-TypeError: Cannot read properties of undefined (reading 'setMimeType')
-setCorsHeaders	@ Code.gs:18
+    if (action === 'update') {
+      const calendarId = CALENDAR_MAP[data.resourceId];
+      const cal = CalendarApp.getCalendarById(calendarId);
+      const event = cal.getEventById(data.id);
 
+      if (!event) throw new Error("Event not found");
 
+      event.setTitle(data.title);
+      event.setTime(new Date(data.start), new Date(data.end));
 
+      const output = ContentService.createTextOutput(JSON.stringify({
+        status: 'updated',
+        id: data.id
+      })).setMimeType(ContentService.MimeType.JSON);
+      return setCors(output);
+    }
 
-Execution log
-8:20:33 PM	Notice	Execution started
-8:20:33 PM	Error	
-TypeError: Cannot read properties of undefined (reading 'split')
-parseFormData	@ Code.gs:8
+    if (action === 'delete') {
+      let found = false;
+      for (const calendarId of Object.values(CALENDAR_MAP)) {
+        const cal = CalendarApp.getCalendarById(calendarId);
+        const event = cal.getEventById(data.id);
+        if (event) {
+          event.deleteEvent();
+          found = true;
+          break;
+        }
+      }
 
+      const output = ContentService.createTextOutput(JSON.stringify({
+        status: found ? 'deleted' : 'error',
+        message: found ? 'Event deleted' : 'Event not found',
+        id: data.id
+      })).setMimeType(ContentService.MimeType.JSON);
+      return setCors(output);
+    }
 
+    throw new Error("Unknown action: " + action);
 
-
-
-
-Execution log
-8:18:27 PM	Notice	Execution started
-8:18:27 PM	Info	=== doPost triggered ===
-8:18:27 PM	Info	Event object: null
-8:18:27 PM	Info	No postData found
-8:18:28 PM	Error	
-TypeError: output.setMimeType(...).setHeader is not a function
-setCorsHeaders	@ Code.gs:19
-doPost	@ Code.gs:34
-
-
-
-
-
-
-
-
-Access to fetch at 'https://script.google.com/macros/s/AKfycbwRYaSEG4zZXlaW1l34kJsGNrft8EszENNvhRBeHeT7jqYN-w5q_OV1d4WYI46BsLPI/exec' from origin 'https://zadoroznyj.github.io' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.
-
-Calendar-Vkurko/:181 
- POST https://script.google.com/macros/s/AKfycbwRYaSEG4zZXlaW1l34kJsGNrft8EszENNvhRBeHeT7jqYN-w5q_OV1d4WYI46BsLPI/exec net::ERR_FAILED 200 (OK)
-loadEvents	@	Calendar-Vkurko/:181
-(anonymous)	@	Calendar-Vkurko/:448
-Calendar-Vkurko/:191 Ошибка загрузки событий: 
-loadEvents	@	Calendar-Vkurko/:191
-await in loadEvents		
-(anonymous)	@	Calendar-Vkurko/:448
-
-
-
-
-
-
-Ошибка загрузки событий: Failed to fetch
-
+  } catch (err) {
+    Logger.log("Error: " + err.message);
+    const output = ContentService.createTextOutput(JSON.stringify({
+      status: 'error',
+      message: err.message
+    })).setMimeType(ContentService.MimeType.JSON);
+    return setCors(output);
+  }
+}
 
 
 
