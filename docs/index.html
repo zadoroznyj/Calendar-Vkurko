@@ -1,3 +1,47 @@
+function doGet(e) {
+  const calendarId = 'primary'; // или другой ID: например, 'irina.salon11@gmail.com'
+  const calendar = CalendarApp.getCalendarById(calendarId);
+
+  const from = new Date('2025-01-01');
+  const to = new Date('2026-01-01');
+
+  const events = calendar.getEvents(from, to).map(ev => ({
+    id: ev.getId(),
+    title: ev.getTitle(),
+    start: ev.getStartTime().toISOString(),
+    end: ev.getEndTime().toISOString(),
+    allDay: ev.isAllDayEvent()
+  }));
+
+  return ContentService
+    .createTextOutput(JSON.stringify(events))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+
+
+
+
+
+
+
+
+Access to fetch at 'https://script.google.com/macros/s/AKfycbzeKxxtnjy2oeghcBlpNOqiZmlFg3YUh2iOBSOuN-UwUiu9dlrUIittcqWmWAe45g2_/exec' from origin 'https://zadoroznyj.github.io' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.
+Calendar-Vkurko/:181 
+ POST https://script.google.com/macros/s/AKfycbzeKxxtnjy2oeghcBlpNOqiZmlFg3YUh2iOBSOuN-UwUiu9dlrUIittcqWmWAe45g2_/exec net::ERR_FAILED 200 (OK)
+loadEvents	@	Calendar-Vkurko/:181
+(anonymous)	@	Calendar-Vkurko/:448
+
+Calendar-Vkurko/:191 Ошибка загрузки событий: 
+loadEvents	@	Calendar-Vkurko/:191
+await in loadEvents		
+(anonymous)	@	Calendar-Vkurko/:448
+
+
+
+
+
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
