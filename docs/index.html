@@ -1,19 +1,23 @@
-if (data.status === "updated") {
-  event.setProp("title", newTitle);
-} else {
-  alert("Ошибка обновления события: " + (data.message || "неизвестная ошибка"));
-}
+const params = new URLSearchParams({
+  action: "update",
+  id: event.id,
+  title: newTitle,
+  start: event.start.toISOString(),
+  end: event.end ? event.end.toISOString() : ""
+});
 
 
 
 
 
-if (data.status === "updated") {
-  loadEvents(); // перезагрузим события после редактирования
-} else {
-  alert("Ошибка обновления события: " + (data.message || "неизвестная ошибка"));
-}
 
+const params = new URLSearchParams({
+  action: "update",
+  id: event.id,
+  title: newTitle,
+  startTime: event.start.toISOString(),
+  endTime: event.end ? event.end.toISOString() : ""
+});
 
 
 
