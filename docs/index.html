@@ -1,70 +1,142 @@
-Calendar-Vkurko/:1 Access to fetch at 'https://script.google.com/macros/s/AKfycbxeYWIUje6my9kWj_7qcxrnQK9NM0CcXzDUdd1o7GQ8ysUVTUZus7AdcZCg_t99OGVa/exec' from origin 'https://zadoroznyj.github.io' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.
+const CALENDAR_MAP = {
+  1: 'irina.salon11@gmail.com',
+  2: 'primary'
+};
 
-Calendar-Vkurko/:181 
- POST https://script.google.com/macros/s/AKfycbxeYWIUje6my9kWj_7qcxrnQK9NM0CcXzDUdd1o7GQ8ysUVTUZus7AdcZCg_t99OGVa/exec net::ERR_FAILED 200 (OK)
-loadEvents	@	Calendar-Vkurko/:181
-(anonymous)	@	Calendar-Vkurko/:448
-Calendar-Vkurko/:191 Ошибка загрузки событий: TypeError: Failed to fetch
-    at loadEvents (Calendar-Vkurko/:181:30)
-    at Calendar-Vkurko/:448:3
-loadEvents	@	Calendar-Vkurko/:191
-await in loadEvents		
-(anonymous)	@	Calendar-Vkurko/:448
+function parseFormData(form) {
+  const pairs = form.split("&");
+  const result = {};
+  for (const pair of pairs) {
+    const [key, value] = pair.split("=");
+    result[decodeURIComponent(key)] = decodeURIComponent(value || "");
+  }
+  return result;
+}
 
+function setCorsHeaders(output) {
+  return output
+    .setMimeType(ContentService.MimeType.JSON)
+    .setHeader("Access-Control-Allow-Origin", "*")
+    .setHeader("Access-Control-Allow-Methods", "POST, OPTIONS")
+    .setHeader("Access-Control-Allow-Headers", "Content-Type");
+}
 
+function doGet() {
+  Logger.log("=== doGet triggered ===");
 
+  const output = ContentService.createTextOutput(JSON.stringify({ status: 'ok' }));
+  return setCorsHeaders(output);
+}
 
+function doPost(e) {
+  Logger.log("=== doPost triggered ===");
+  Logger.log("Event object: " + JSON.stringify(e));
 
+  if (!e || !e.postData) {
+    Logger.log("No postData found");
+    const output = ContentService.createTextOutput(JSON.stringify({
+      status: 'error',
+      message: 'No postData'
+    }));
+    return setCorsHeaders(output);
+  }
 
-Ошибка загрузки событий: Failed to fetch
+  const data = parseFormData(e.postData.contents);
+  const action = data.action;
+  Logger.log("Parsed data: " + JSON.stringify(data));
 
+  try {
+    if (action === 'get') {
+      const allEvents = [];
 
+      for (const [resId, calendarId] of Object.entries(CALENDAR_MAP)) {
+        const cal = CalendarApp.getCalendarById(calendarId);
+        const events = cal.getEvents(new Date('2025-01-01'), new Date('2026-01-01'));
 
+        for (const ev of events) {
+          allEvents.push({
+            id: ev.getId(),
+            title: ev.getTitle(),
+            start: ev.getStartTime().toISOString(),
+            end: ev.getEndTime().toISOString(),
+            resourceId: parseInt(resId),
+            allDay: false,
+            color: '#3788d8',
+            extendedProps: {
+              calendarKey: resId == 1 ? 'master1' : 'master2'
+            }
+          });
+        }
+      }
 
+      const output = ContentService.createTextOutput(JSON.stringify(allEvents));
+      return setCorsHeaders(output);
+    }
 
-Notice	Execution started
-8:04:44 PM	Info	=== doGet triggered ===
-8:04:44 PM	Notice	Execution completed
+    if (action === 'create') {
+      const calendarId = CALENDAR_MAP[data.resourceId];
+      const cal = CalendarApp.getCalendarById(calendarId);
+      const event = cal.createEvent(data.title, new Date(data.start), new Date(data.end));
 
+      const output = ContentService.createTextOutput(JSON.stringify({
+        status: 'created',
+        id: event.getId()
+      }));
+      return setCorsHeaders(output);
+    }
 
+    if (action === 'update') {
+      const calendarId = CALENDAR_MAP[data.resourceId];
+      const cal = CalendarApp.getCalendarById(calendarId);
+      const event = cal.getEventById(data.id);
+      if (!event) throw new Error("Event not found");
 
+      event.setTitle(data.title);
+      event.setTime(new Date(data.start), new Date(data.end));
 
+      const output = ContentService.createTextOutput(JSON.stringify({
+        status: 'updated',
+        id: data.id
+      }));
+      return setCorsHeaders(output);
+    }
 
+    if (action === 'delete') {
+      for (const calendarId of Object.values(CALENDAR_MAP)) {
+        const cal = CalendarApp.getCalendarById(calendarId);
+        const event = cal.getEventById(data.id);
+        if (event) {
+          event.deleteEvent();
+          const output = ContentService.createTextOutput(JSON.stringify({
+            status: 'deleted',
+            id: data.id
+          }));
+          return setCorsHeaders(output);
+        }
+      }
 
+      const output = ContentService.createTextOutput(JSON.stringify({
+        status: 'error',
+        message: 'Event not found'
+      }));
+      return setCorsHeaders(output);
+    }
 
-8:04:20 PM	Notice	Execution started
-8:04:20 PM	Info	=== doPost triggered ===
-8:04:20 PM	Info	Event object: null
-8:04:20 PM	Info	No postData found
-8:04:20 PM	Error	
-TypeError: output.setMimeType(...).setHeader is not a function
-setHeaders	@ Code.gs:19
-doPost	@ Code.gs:30
+    const output = ContentService.createTextOutput(JSON.stringify({
+      status: 'error',
+      message: 'Unknown action'
+    }));
+    return setCorsHeaders(output);
 
-
-
-
-
-
-
-8:04:00 PM	Notice	Execution started
-8:04:00 PM	Error	
-TypeError: Cannot read properties of undefined (reading 'setMimeType')
-setHeaders	@ Code.gs:18
-
-
-
-
-
-
-
-8:03:22 PM	Notice	Execution started
-8:03:23 PM	Error	
-TypeError: Cannot read properties of undefined (reading 'split')
-parseFormData	@ Code.gs:7
-
-
-
+  } catch (err) {
+    Logger.log("ERROR: " + err.message);
+    const output = ContentService.createTextOutput(JSON.stringify({
+      status: 'error',
+      message: err.message
+    }));
+    return setCorsHeaders(output);
+  }
+}
 
 
 
