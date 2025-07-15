@@ -1,31 +1,119 @@
-7:45:43 PM	Notice	Execution started
-7:45:42 PM	Info	=== doPost triggered ===
-7:45:42 PM	Info	Event object: undefined
-7:45:42 PM	Info	No postData found
-7:45:44 PM	Error	
-TypeError: output.appendHeader is not a function
-setHeaders	@ Code.gs:25
-doPost	@ Code.gs:35
+const CALENDAR_MAP = {
+  1: 'irina.salon11@gmail.com',
+  2: 'primary'
+};
 
+function parseFormData(form) {
+  const pairs = form.split("&");
+  const result = {};
+  for (const pair of pairs) {
+    const [key, value] = pair.split("=");
+    result[decodeURIComponent(key)] = decodeURIComponent(value || "");
+  }
+  return result;
+}
 
+function doPost(e) {
+  Logger.log('=== doPost triggered ===');
+  Logger.log('Event object: ' + JSON.stringify(e));
 
+  if (!e || !e.postData || !e.postData.contents) {
+    Logger.log('No postData found');
+    return createJsonResponse({ status: 'error', message: 'No postData' });
+  }
 
-7:43:56 PM	Notice	Execution started
-7:43:56 PM	Error	
-TypeError: Cannot read properties of undefined (reading 'split')
-parseFormData	@ Code.gs:7
+  const data = parseFormData(e.postData.contents);
+  Logger.log('Parsed data: ' + JSON.stringify(data));
 
+  const action = data.action;
 
+  try {
+    if (action === 'get') {
+      Logger.log('Processing action=get');
+      const allEvents = [];
 
+      for (const [resId, calendarId] of Object.entries(CALENDAR_MAP)) {
+        Logger.log('Fetching from calendar: ' + calendarId);
+        const cal = CalendarApp.getCalendarById(calendarId);
+        const events = cal.getEvents(new Date('2025-01-01'), new Date('2026-01-01'));
+        Logger.log('Found events: ' + events.length);
 
+        for (const ev of events) {
+          allEvents.push({
+            id: ev.getId(),
+            title: ev.getTitle(),
+            start: ev.getStartTime().toISOString(),
+            end: ev.getEndTime().toISOString(),
+            resourceId: parseInt(resId),
+            allDay: false,
+            color: '#3788d8',
+            extendedProps: {
+              calendarKey: resId == 1 ? 'master1' : 'master2'
+            }
+          });
+        }
+      }
 
-Calendar-Vkurko/:186 Ошибка загрузки событий: TypeError: e.map is not a function
-    at Object.Xr [as events] (index.iife.js:12:1)
-    at ou._set (index.iife.js:12:1)
-    at Object.S [as setOption] (index.iife.js:12:1)
-    at loadEvents (Calendar-Vkurko/:183:10)
+      Logger.log('Total events returned: ' + allEvents.length);
+      return createJsonResponse(allEvents);
+    }
 
+    if (action === 'create') {
+      const calendarId = CALENDAR_MAP[data.resourceId];
+      const cal = CalendarApp.getCalendarById(calendarId);
+      const event = cal.createEvent(data.title, new Date(data.start), new Date(data.end));
+      Logger.log('Created event with ID: ' + event.getId());
 
+      return createJsonResponse({ status: 'created', id: event.getId() });
+    }
+
+    if (action === 'update') {
+      const calendarId = CALENDAR_MAP[data.resourceId];
+      const cal = CalendarApp.getCalendarById(calendarId);
+      const event = cal.getEventById(data.id);
+      if (!event) throw new Error("Event not found");
+
+      event.setTitle(data.title);
+      event.setTime(new Date(data.start), new Date(data.end));
+      Logger.log('Updated event ID: ' + data.id);
+
+      return createJsonResponse({ status: 'updated', id: data.id });
+    }
+
+    if (action === 'delete') {
+      for (const calendarId of Object.values(CALENDAR_MAP)) {
+        const cal = CalendarApp.getCalendarById(calendarId);
+        const event = cal.getEventById(data.id);
+        if (event) {
+          event.deleteEvent();
+          Logger.log('Deleted event ID: ' + data.id);
+          return createJsonResponse({ status: 'deleted', id: data.id });
+        }
+      }
+
+      Logger.log('Event not found for delete');
+      return createJsonResponse({ status: 'error', message: 'Event not found' });
+    }
+
+    Logger.log('Unknown action: ' + action);
+    return createJsonResponse({ status: 'error', message: 'Unknown action' });
+
+  } catch (err) {
+    Logger.log('ERROR: ' + err.message);
+    return createJsonResponse({ status: 'error', message: err.message });
+  }
+}
+
+function createJsonResponse(obj) {
+  const output = ContentService.createTextOutput(JSON.stringify(obj));
+  output.setMimeType(ContentService.MimeType.JSON);
+  // Вручную заголовки CORS не добавляются через ContentService.
+  return output;
+}
+
+function doGet() {
+  return createJsonResponse({ status: 'ok' });
+}
 
 
 
