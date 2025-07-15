@@ -1,37 +1,601 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>EventCalendar</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@event-calendar/build@4.5.0/dist/event-calendar.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@event-calendar/build@4.5.0/dist/event-calendar.min.js"></script>
+  <script src="https://hammerjs.github.io/dist/hammer.min.js"></script>
+  <style>
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #fff;
+      color: #000;
+    }
+    header, footer {
+      padding: 8px 16px;
+      background: #fff;
+    }
+    .mode-switcher {
+      display: flex;
+      justify-content: space-around;
+      font-size: 16px;
+      padding: 8px 0;
+      font-weight: 500;
+    }
+    .mode-switcher span {
+      color: #555;
+      cursor: pointer;
+      padding: 4px 12px;
+      border-radius: 16px;
+      transition: background 0.2s, color 0.2s;
+    }
+    .mode-switcher .active {
+      background: #000;
+      color: #fff;
+      font-weight: 600;
+    }
+    .calendar-title {
+      font-size: 22px;
+      font-weight: 600;
+      padding: 4px 16px;
+    }
+    .calendar-subtitle {
+      font-size: 14px;
+      padding-left: 16px;
+      color: #999;
+    }
+    .month-footer {
+      display: flex;
+      justify-content: space-around;
+      font-size: 16px;
+      padding: 10px 0px;
+    }
+    .month-footer span {
+      color: #664;
+      cursor: pointer;
+      padding: 4px 12px;
+      border-radius: 16px;
+    }
+    .month-footer span.active {
+      background: #000;
+      color: #fff;
+    }
+    .month-footer span.current-month {
+      color: #005aff;
+      font-weight: 600;
+    }
+    #ec {
+      width: 100%;
+      height: calc(100vh - 200px);
+    }
+    .day-footer {
+      display: flex;
+      justify-content: space-around;
+      padding: 8px 0;
+      background: #fff;
+      font-size: 14px;
+    }
+    .day-footer .day-item {
+      flex: 1;
+      text-align: center;
+      cursor: pointer;
+      color: #664;
+    }
+    .day-footer .circle {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      width: 56px;
+      height: 42px;
+      border-radius: 21px;
+      transition: background 0.2s, color 0.2s;
+    }
+    .day-footer .active .circle {
+      background: #000;
+      color: #fff;
+    }
+    .day-footer .day-name {
+      font-size: 11px;
+      line-height: 1;
+    }
+    .day-footer .day-number {
+      font-size: 15px;
+      font-weight: 600;
+      line-height: 1;
+    }
+    .day-footer .day-month {
+      font-size: 10px;
+      line-height: 1;
+      margin-top: 2px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="mode-switcher" id="modeSwitcher">
+      <span data-view="listWeek">List</span>
+      <span data-view="resourceTimeGridDay">Day</span>
+      <span data-view="resourceTimeGridWeek">Week</span>
+      <span data-view="dayGridMonth" class="active">Month</span>
+      <span data-view="resourceTimelineWeek">Planner</span>
+    </div>
+    <div class="calendar-title" id="calendarTitle">July 2025</div>
+    <div class="calendar-subtitle" id="calendarSubtitle"></div>
+  </header>
+
+  <main>
+    <div id="ec"></div>
+  </main>
+
+  <footer>
+    <div class="month-footer" id="monthFooter"></div>
+    <div class="day-footer" id="dayFooter" style="display: none;"></div>
+  </footer>
+
+<script>
+  let touchStartX = 0;
+  let touchEndX = 0;
+  let lastClickedDate = null;
+  let lastTapTime = 0;
+
+  const GAS_URL = 'https://script.google.com/macros/s/AKfycbwJhRb_Wn9Nyo4o4Bf66dfhQlNUftx2cSDIJKCdvj75owTOkXzHCCMevxai0z3Eqz_I/exec';
+
+  const ec = EventCalendar.create(document.getElementById("ec"), {
+    view: "dayGridMonth",
+    firstDay: 1,
+    timeFormat: 'HH:mm',
+    headerToolbar: false,
+    height: "100%",
+    date: new Date().toISOString().slice(0, 10),
+    resources: [
+      { id: 1, title: "Наталья" },
+      { id: 2, title: "Ирина" },
+    ],
+    events: [], // загрузим ниже
+    nowIndicator: true,
+    selectable: true,
+    dayMaxEvents: true,
+    scrollTime: "08:00:00",
+    slotMinTime: "00:00:00",
+    slotMaxTime: "24:00:00",
+    slotLabelFormat: {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    },
+    select: function(info) {
+      createEventPrompt(info);
+    },
+    eventClick: function(info) {
+      editEventPrompt(info.event);
+    }
+  });
+
+  async function loadEvents() {
+    try {
+      const params = new URLSearchParams({ action: 'get' });
+      const response = await fetch(GAS_URL, {
+        method: 'POST',
+        headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
+        body: params.toString()
+      });
+      if (!response.ok) throw new Error('Network response was not ok');
+      const events = await response.json();
+      ec.setOption('events', events);
+      updateTitle();
+    } catch (error) {
+      console.error('Ошибка загрузки событий:', error);
+      alert('Ошибка загрузки событий: ' + error.message);
+    }
+  }
+
+  const calendarEl = document.getElementById("ec");
+  const hammer = new Hammer(calendarEl);
+  hammer.get("doubletap").set({ interval: 300 });
+
+  hammer.on("doubletap", function () {
+    if (lastClickedDate && Date.now() - lastTapTime < 600) {
+      ec.setOption("date", lastClickedDate);
+      ec.setOption("view", "resourceTimeGridDay");
+      updateActiveMode("resourceTimeGridDay");
+      updateTitle();
+    }
+  });
+
+  document.addEventListener("touchstart", e => {
+    touchStartX = e.changedTouches[0].screenX;
+  });
+
+  document.addEventListener("touchend", e => {
+    touchEndX = e.changedTouches[0].screenX;
+    let delta = touchEndX - touchStartX;
+    if (Math.abs(delta) > 50) {
+      if (delta > 0) ec.prev();
+      else ec.next();
+      updateTitle();
+    }
+  });
+
+  document.getElementById("modeSwitcher").addEventListener("click", (e) => {
+    if (e.target.dataset.view) {
+      const currentDate = ec.getOption("date");
+      ec.setOption("date", currentDate);
+      ec.setOption("view", e.target.dataset.view);
+      updateActiveMode(e.target.dataset.view);
+      updateTitle();
+    }
+  });
+
+  document.getElementById("dayFooter").addEventListener("click", (e) => {
+    const item = e.target.closest('.day-item');
+    if (item && item.dataset.date) {
+      ec.setOption("date", item.dataset.date);
+      ec.setOption("view", "resourceTimeGridDay");
+      updateActiveMode("resourceTimeGridDay");
+      updateTitle();
+    }
+  });
+
+  ec.setOption("dateClick", function(info) {
+    lastClickedDate = info.dateStr;
+    lastTapTime = Date.now();
+  });
+
+  // --- Создание события с синхронизацией на сервер (application/x-www-form-urlencoded)
+  function createEventPrompt(selectInfo) {
+    const title = prompt("Введите название нового события:", "");
+    if (!title) return;
+
+    const params = new URLSearchParams({
+      action: "create",
+      title: title,
+      start: selectInfo.startStr,
+      end: selectInfo.endStr,
+      resourceId: selectInfo.resource ? selectInfo.resource.id : 1,
+      allDay: selectInfo.allDay || false
+    });
+
+    fetch(GAS_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
+      body: params.toString()
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.status === "created") {
+        loadEvents(); // обновляем календарь
+      } else {
+        alert("Ошибка создания события: " + (data.message || "неизвестная ошибка"));
+      }
+    })
+    .catch(err => {
+      console.error("Ошибка отправки create:", err);
+      alert("Ошибка отправки create: " + err.message);
+    });
+  }
+
+  // --- Редактирование или удаление события с синхронизацией на сервер (application/x-www-form-urlencoded)
+  function editEventPrompt(event) {
+    const newTitle = prompt("Редактировать название события:", event.title);
+    if (newTitle === null) return;
+
+    if (newTitle === "") {
+      if (confirm("Удалить событие?")) {
+        const params = new URLSearchParams({
+          action: "delete",
+          id: event.id
+        });
+        fetch(GAS_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
+          body: params.toString()
+        })
+        .then(res => res.json())
+        .then(data => {
+          if (data.status === "deleted") {
+            loadEvents();
+          } else {
+            alert("Ошибка удаления события: " + (data.message || "неизвестная ошибка"));
+          }
+        })
+        .catch(err => {
+          console.error("Ошибка удаления:", err);
+          alert("Ошибка удаления: " + err.message);
+        });
+      }
+      return;
+    }
+
+    // Обновление
+    const params = new URLSearchParams({
+      action: "update",
+      id: event.id,
+      title: newTitle,
+      start: event.start.toISOString(),
+      end: event.end ? event.end.toISOString() : ""
+    });
+
+    fetch(GAS_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
+      body: params.toString()
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.status === "updated") {
+        event.setProp("title", newTitle);
+      } else {
+        alert("Ошибка обновления события: " + (data.message || "неизвестная ошибка"));
+      }
+    })
+    .catch(err => {
+      console.error("Ошибка отправки update:", err);
+      alert("Ошибка отправки update: " + err.message);
+    });
+  }
+
+  function updateActiveMode(viewName) {
+    document.querySelectorAll("#modeSwitcher span").forEach(el => {
+      el.classList.toggle("active", el.dataset.view === viewName);
+    });
+    document.getElementById("dayFooter").style.display = viewName === "resourceTimeGridDay" ? "flex" : "none";
+    document.getElementById("monthFooter").style.display = viewName === "resourceTimeGridDay" ? "none" : "flex";
+  }
+
+  function updateTitle() {
+    const dateStr = ec.getOption("date");
+    const date = new Date(dateStr);
+    const view = ec.getOption("view");
+
+    const day = date.getDate();
+    const dow = date.toLocaleString('default', { weekday: 'long' });
+    const monthShort = date.toLocaleString('default', { month: 'short' });
+
+    if (view === "resourceTimeGridDay") {
+      document.getElementById("calendarTitle").textContent = `${dow}, ${day} ${monthShort}`;
+      document.getElementById("calendarSubtitle").textContent = `Week ${getWeekNumber(date)}`;
+      updateDayFooterWithDates(date);
+    } else {
+      const month = date.toLocaleString('default', { month: 'long' });
+      const year = date.getFullYear();
+      document.getElementById("calendarTitle").textContent = `${month} ${year}`;
+      document.getElementById("calendarSubtitle").textContent = ``;
+    }
+
+    updateMonthFooter(date);
+  }
+
+  function updateMonthFooter(currentDate) {
+    const footer = document.getElementById("monthFooter");
+    const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    const today = new Date();
+    const currentMonthIndex = currentDate.getMonth();
+    const currentYear = currentDate.getFullYear();
+
+    footer.innerHTML = "";
+
+    for (let i = -3; i <= 3; i++) {
+      const date = new Date(currentYear, currentMonthIndex + i, 1);
+      const index = date.getMonth();
+      const year = date.getFullYear();
+
+      const span = document.createElement("span");
+      span.textContent = months[index];
+      span.dataset.month = index;
+      span.classList.toggle("active", i === 0);
+
+      const isTodayMonth = index === today.getMonth() && year === today.getFullYear();
+      const isSelected = i === 0;
+
+      if (isTodayMonth && !isSelected) {
+        span.classList.add("current-month");
+      }
+
+      span.addEventListener("click", () => {
+        const newDate = new Date(currentYear, index, 1);
+        ec.setOption("date", newDate.toISOString().slice(0, 10));
+        ec.setOption("view", "dayGridMonth");
+        updateTitle();
+      });
+
+      footer.appendChild(span);
+    }
+  }
+
+  function updateDayFooterWithDates(date) {
+    const footer = document.getElementById("dayFooter");
+    footer.innerHTML = "";
+
+    const startOfWeek = new Date(date);
+    startOfWeek.setDate(date.getDate() - ((date.getDay() + 6) % 7)); // Monday
+
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(startOfWeek);
+      d.setDate(d.getDate() + i);
+      const iso = d.toISOString().slice(0, 10);
+
+      const dow = d.toLocaleString('default', { weekday: 'short' });
+      const day = d.getDate();
+      const isActive = d.toDateString() === date.toDateString();
+      const month = d.toLocaleString('default', { month: 'short' });
+
+      const div = document.createElement("div");
+      div.className = "day-item" + (isActive ? " active" : "");
+      div.dataset.date = iso;
+      div.innerHTML = `
+        <div class="circle">
+          <div class="day-name">${dow}</div>
+          <div class="day-number">${day}</div>
+          ${isActive ? `<div class="day-month">${month}</div>` : ""}
+        </div>
+      `;
+      footer.appendChild(div);
+    }
+  }
+
+  function getWeekNumber(d) {
+    d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+  }
+
+  // Загружаем события сразу
+  loadEvents();
+</script>
+</body>
+</html>
 
 
 
 
 
 
-7:51:56 PM	Notice	Execution started
-7:51:56 PM	Info	=== doPost triggered ===
-7:51:56 PM	Info	Event object: undefined
-7:51:56 PM	Info	No postData found
-7:51:56 PM	Notice	Execution completed
 
 
 
+const CALENDAR_MAP = {
+  1: 'irina.salon11@gmail.com',
+  2: 'primary'
+};
 
+function parseFormData(form) {
+  const pairs = form.split("&");
+  const result = {};
+  for (const pair of pairs) {
+    const [key, value] = pair.split("=");
+    result[decodeURIComponent(key)] = decodeURIComponent(value || "");
+  }
+  return result;
+}
 
-7:50:52 PM	Notice	Execution started
-7:50:53 PM	Error	
-TypeError: Cannot read properties of undefined (reading 'split')
-parseFormData	@ Code.gs:7
+function setHeaders(output) {
+  return output
+    .setMimeType(ContentService.MimeType.JSON)
+    .setHeader('Access-Control-Allow-Origin', '*')
+    .setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
+    .setHeader('Access-Control-Allow-Headers', 'Content-Type');
+}
 
+function doPost(e) {
+  Logger.log("=== doPost triggered ===");
+  Logger.log("Event object: %s", JSON.stringify(e));
 
+  if (!e || !e.postData) {
+    Logger.log("No postData found");
+    return setHeaders(ContentService.createTextOutput(JSON.stringify({
+      status: 'error',
+      message: 'No postData'
+    })));
+  }
 
+  const data = parseFormData(e.postData.contents);
+  Logger.log("Parsed data: %s", JSON.stringify(data));
 
+  const action = data.action;
+  Logger.log("Action: %s", action);
 
+  try {
+    if (action === 'get') {
+      const allEvents = [];
 
-шибка загрузки событий: TypeError: e.map is not a function
-    at Object.Xr [as events] (index.iife.js:12:1)
-    at ou._set (index.iife.js:12:1)
-    at Object.S [as setOption] (index.iife.js:12:1)
-    at loadEvents (Calendar-Vkurko/:183:10)
-loadEvents @ Calendar-Vkurko/:186
-await in loadEvents
-(anonymous) @ Calendar-Vkurko/:441Understand this error
+      for (const [resId, calendarId] of Object.entries(CALENDAR_MAP)) {
+        const cal = CalendarApp.getCalendarById(calendarId);
+        const events = cal.getEvents(new Date('2025-01-01'), new Date('2026-01-01'));
+        Logger.log("Loaded %s events for calendar %s", events.length, calendarId);
+
+        for (const ev of events) {
+          allEvents.push({
+            id: ev.getId(),
+            title: ev.getTitle(),
+            start: ev.getStartTime().toISOString(),
+            end: ev.getEndTime().toISOString(),
+            resourceId: parseInt(resId),
+            allDay: false,
+            color: '#3788d8',
+            extendedProps: {
+              calendarKey: resId == 1 ? 'master1' : 'master2'
+            }
+          });
+        }
+      }
+
+      Logger.log("Returning %s events", allEvents.length);
+      return setHeaders(ContentService.createTextOutput(JSON.stringify(allEvents)));
+    }
+
+    if (action === 'create') {
+      const calendarId = CALENDAR_MAP[data.resourceId];
+      const cal = CalendarApp.getCalendarById(calendarId);
+      const event = cal.createEvent(data.title, new Date(data.start), new Date(data.end));
+      Logger.log("Created event: %s", event.getId());
+
+      return setHeaders(ContentService.createTextOutput(JSON.stringify({
+        status: 'created',
+        id: event.getId()
+      })));
+    }
+
+    if (action === 'update') {
+      const calendarId = CALENDAR_MAP[data.resourceId];
+      const cal = CalendarApp.getCalendarById(calendarId);
+      const event = cal.getEventById(data.id);
+      if (!event) throw new Error("Event not found");
+
+      event.setTitle(data.title);
+      event.setTime(new Date(data.start), new Date(data.end));
+      Logger.log("Updated event: %s", data.id);
+
+      return setHeaders(ContentService.createTextOutput(JSON.stringify({
+        status: 'updated',
+        id: data.id
+      })));
+    }
+
+    if (action === 'delete') {
+      for (const calendarId of Object.values(CALENDAR_MAP)) {
+        const cal = CalendarApp.getCalendarById(calendarId);
+        const event = cal.getEventById(data.id);
+        if (event) {
+          event.deleteEvent();
+          Logger.log("Deleted event: %s", data.id);
+          return setHeaders(ContentService.createTextOutput(JSON.stringify({
+            status: 'deleted',
+            id: data.id
+          })));
+        }
+      }
+      Logger.log("Event not found: %s", data.id);
+      return setHeaders(ContentService.createTextOutput(JSON.stringify({
+        status: 'error',
+        message: 'Event not found'
+      })));
+    }
+
+    Logger.log("Unknown action: %s", action);
+    return setHeaders(ContentService.createTextOutput(JSON.stringify({
+      status: 'error',
+      message: 'Unknown action'
+    })));
+
+  } catch (err) {
+    Logger.log("Error: %s", err.message);
+    return setHeaders(ContentService.createTextOutput(JSON.stringify({
+      status: 'error',
+      message: err.message
+    })));
+  }
+}
+
+function doGet() {
+  Logger.log("=== doGet triggered ===");
+  return ContentService.createTextOutput(JSON.stringify({ status: 'ok' }))
+    .setMimeType(ContentService.MimeType.JSON);
+}
 
 
 
