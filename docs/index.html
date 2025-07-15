@@ -15,7 +15,7 @@ function doPost(e) {
     const groupId = new Date().getTime().toString();
 
     // Выбираем календарь по полю "calendar", по умолчанию master1
-    const calendarKey = data.calendar || "irina.salon11@gmail.com";
+    const calendarKey = data.calendar || "master1";
     const calendarId = calendarMap[calendarKey];
 
     if (!calendarId) {
