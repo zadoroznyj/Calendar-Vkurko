@@ -1,3 +1,27 @@
+function doGet(e) {
+  const calendarId = 'primary'; // или другой ID: например, 'irina.salon11@gmail.com'
+  const calendar = CalendarApp.getCalendarById(calendarId);
+
+  const from = new Date('2025-01-01');
+  const to = new Date('2026-01-01');
+
+  const events = calendar.getEvents(from, to).map(ev => ({
+    id: ev.getId(),
+    title: ev.getTitle(),
+    start: ev.getStartTime().toISOString(),
+    end: ev.getEndTime().toISOString(),
+    allDay: ev.isAllDayEvent()
+  }));
+
+  return ContentService
+    .createTextOutput(JSON.stringify(events))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+
+
+
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
