@@ -126,16 +126,13 @@
     <div class="calendar-title" id="calendarTitle">July 2025</div>
     <div class="calendar-subtitle" id="calendarSubtitle"></div>
   </header>
-
   <main>
     <div id="ec"></div>
   </main>
-
   <footer>
     <div class="month-footer" id="monthFooter"></div>
     <div class="day-footer" id="dayFooter" style="display: none;"></div>
   </footer>
-
 <script>
   let touchStartX = 0;
   let touchEndX = 0;
@@ -177,6 +174,9 @@
 
   // Метка для хранения сроков жизни кэша
   const CACHE_META_KEY = 'events-cache-meta';
+
+  // Храним текущие события в памяти для локального обновления
+  let currentEvents = [];
 
   // Получить кэш-мета объект из localStorage
   function getCacheMeta() {
@@ -240,7 +240,8 @@
     return { start, end };
   }
 
-  async function loadEvents() {
+  // loadEvents принимает флаг silent - если true, обновляем currentEvents, но не меняем UI
+  async function loadEvents(silent = false) {
     try {
       const range = getVisibleRange();
       const rangeKey = `events-${range.start.toISOString()}-${range.end.toISOString()}`;
@@ -248,9 +249,11 @@
       const now = Date.now();
 
       if (localStorage.getItem(rangeKey) && meta[rangeKey] && now < meta[rangeKey].expiresAt) {
-        const cachedEvents = JSON.parse(localStorage.getItem(rangeKey));
-        ec.setOption('events', cachedEvents);
-        updateTitle();
+        currentEvents = JSON.parse(localStorage.getItem(rangeKey));
+        if (!silent) {
+          ec.setOption('events', currentEvents);
+          updateTitle();
+        }
         return;
       } else {
         // Если устарел кэш — удаляем старые данные
@@ -290,14 +293,18 @@
         }
       }
 
-      ec.setOption('events', allEvents);
+      currentEvents = allEvents;
+
+      if (!silent) {
+        ec.setOption('events', currentEvents);
+        updateTitle();
+      }
 
       // Сохраняем в кэш и обновляем meta с TTL 10 минут
-      localStorage.setItem(rangeKey, JSON.stringify(allEvents));
+      localStorage.setItem(rangeKey, JSON.stringify(currentEvents));
       meta[rangeKey] = { expiresAt: now + 10 * 60 * 1000 };
       setCacheMeta(meta);
 
-      updateTitle();
     } catch (error) {
       console.error('Ошибка загрузки событий:', error);
       alert('Ошибка загрузки событий: ' + error.message);
@@ -359,6 +366,23 @@
     }
   });
 
+  // Обновить событие локально в currentEvents и в UI, без сброса всего кеша и полной перезагрузки
+  function updateEventLocally(updatedEvent) {
+    const index = currentEvents.findIndex(e => e.id === updatedEvent.id);
+    if (index !== -1) {
+      currentEvents[index] = updatedEvent;
+    } else {
+      currentEvents.push(updatedEvent);
+    }
+    ec.setOption('events', currentEvents);
+  }
+
+  // Удалить событие локально из currentEvents и обновить UI
+  function deleteEventLocally(eventId) {
+    currentEvents = currentEvents.filter(e => e.id !== eventId);
+    ec.setOption('events', currentEvents);
+  }
+
   function createEventPrompt(selectInfo) {
     const title = prompt("Введите название нового события:", "");
     if (!title) return;
@@ -377,9 +401,20 @@
     })
     .then(res => res.json())
     .then(data => {
-      if (data.status === "created") {
-        clearAllEventsCache();
-        loadEvents();
+      if (data.status === "created" && data.event) {
+        // Обновляем локально и в UI
+        const newEv = {
+          id: data.event.id,
+          title: data.event.title,
+          start: data.event.start,
+          end: data.event.end,
+          resourceId: data.event.resourceId,
+          calendar: data.event.calendar,
+          color: data.event.calendar === 'master1' ? '#007bff' : '#28a745'
+        };
+        updateEventLocally(newEv);
+        // Загружаем обновления в фоне, не трогая UI
+        loadEvents(true);
       } else {
         alert("Ошибка создания события: " + (data.message || "неизвестная ошибка"));
       }
@@ -405,8 +440,8 @@
         .then(res => res.json())
         .then(data => {
           if (data.status === "deleted") {
-            clearAllEventsCache();
-            loadEvents();
+            deleteEventLocally(event.id);
+            loadEvents(true);
           } else {
             alert("Ошибка удаления события: " + (data.message || "неизвестная ошибка"));
           }
@@ -435,8 +470,17 @@
     .then(res => res.json())
     .then(data => {
       if (data.status === "updated") {
-        clearAllEventsCache();
-        loadEvents();
+        const updatedEv = {
+          id: event.id,
+          title: newTitle,
+          start: event.start.toISOString(),
+          end: event.end ? event.end.toISOString() : null,
+          resourceId: event.resourceId,
+          calendar: event.extendedProps?.calendar || '',
+          color: (event.extendedProps?.calendar === 'master1') ? '#007bff' : '#28a745'
+        };
+        updateEventLocally(updatedEv);
+        loadEvents(true);
       } else {
         alert("Ошибка обновления события: " + (data.message || "неизвестная ошибка"));
       }
@@ -467,95 +511,95 @@
     if (view === "resourceTimeGridDay") {
       document.getElementById("calendarTitle").textContent = `${dow}, ${day} ${monthShort}`;
       document.getElementById("calendarSubtitle").textContent = `Week ${getWeekNumber(date)}`;
-      updateDayFooterWithDates(date);
-    } else {
-      const month = date.toLocaleString('default', { month: 'long' });
-      const year = date.getFullYear();
-      document.getElementById("calendarTitle").textContent = `${month} ${year}`;
-      document.getElementById("calendarSubtitle").textContent = ``;
-    }
+updateDayFooterWithDates(date);
+} else {
+  const month = date.toLocaleString('default', { month: 'long' });
+  const year = date.getFullYear();
+  document.getElementById("calendarTitle").textContent = `${month} ${year}`;
+  document.getElementById("calendarSubtitle").textContent = ``;
+}
 
-    updateMonthFooter(date);
+updateMonthFooter(date);
+}
+
+function updateMonthFooter(currentDate) {
+const footer = document.getElementById("monthFooter");
+const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const today = new Date();
+const currentMonthIndex = currentDate.getMonth();
+const currentYear = currentDate.getFullYear();
+
+footer.innerHTML = "";
+
+for (let i = -3; i <= 3; i++) {
+  const date = new Date(currentYear, currentMonthIndex + i, 1);
+  const index = date.getMonth();
+  const year = date.getFullYear();
+
+  const span = document.createElement("span");
+  span.textContent = months[index];
+  span.dataset.month = index;
+  span.classList.toggle("active", i === 0);
+
+  const isTodayMonth = index === today.getMonth() && year === today.getFullYear();
+  const isSelected = i === 0;
+
+  if (isTodayMonth && !isSelected) {
+    span.classList.add("current-month");
   }
 
-  function updateMonthFooter(currentDate) {
-    const footer = document.getElementById("monthFooter");
-    const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-    const today = new Date();
-    const currentMonthIndex = currentDate.getMonth();
-    const currentYear = currentDate.getFullYear();
+  span.addEventListener("click", () => {
+    const newDate = new Date(currentYear, index, 1);
+    ec.setOption("date", newDate.toISOString().slice(0, 10));
+    ec.setOption("view", "dayGridMonth");
+    loadEvents();
+    updateTitle();
+  });
 
-    footer.innerHTML = "";
+  footer.appendChild(span);
+}
+}
 
-    for (let i = -3; i <= 3; i++) {
-      const date = new Date(currentYear, currentMonthIndex + i, 1);
-            const index = date.getMonth();
-      const year = date.getFullYear();
+function updateDayFooterWithDates(date) {
+const footer = document.getElementById("dayFooter");
+footer.innerHTML = "";
 
-      const span = document.createElement("span");
-      span.textContent = months[index];
-      span.dataset.month = index;
-      span.classList.toggle("active", i === 0);
+const startOfWeek = new Date(date);
+startOfWeek.setDate(date.getDate() - ((date.getDay() + 6) % 7));
 
-      const isTodayMonth = index === today.getMonth() && year === today.getFullYear();
-      const isSelected = i === 0;
+for (let i = 0; i < 7; i++) {
+  const d = new Date(startOfWeek);
+  d.setDate(d.getDate() + i);
+  const iso = d.toISOString().slice(0, 10);
 
-      if (isTodayMonth && !isSelected) {
-        span.classList.add("current-month");
-      }
+  const dow = d.toLocaleString('default', { weekday: 'short' });
+  const day = d.getDate();
+  const isActive = d.toDateString() === date.toDateString();
+  const month = d.toLocaleString('default', { month: 'short' });
 
-      span.addEventListener("click", () => {
-        const newDate = new Date(currentYear, index, 1);
-        ec.setOption("date", newDate.toISOString().slice(0, 10));
-        ec.setOption("view", "dayGridMonth");
-        loadEvents();
-        updateTitle();
-      });
+  const div = document.createElement("div");
+  div.className = "day-item" + (isActive ? " active" : "");
+  div.dataset.date = iso;
+  div.innerHTML = `
+    <div class="circle">
+        <div class="day-name">${dow}</div>
+        <div class="day-number">${day}</div>
+        ${isActive ? `<div class="day-month">${month}</div>` : ""}
+    </div>
+  `;
+  footer.appendChild(div);
+}
+}
 
-      footer.appendChild(span);
-    }
-  }
+function getWeekNumber(d) {
+d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+}
 
-  function updateDayFooterWithDates(date) {
-    const footer = document.getElementById("dayFooter");
-    footer.innerHTML = "";
-
-    const startOfWeek = new Date(date);
-    startOfWeek.setDate(date.getDate() - ((date.getDay() + 6) % 7));
-
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(startOfWeek);
-      d.setDate(d.getDate() + i);
-      const iso = d.toISOString().slice(0, 10);
-
-      const dow = d.toLocaleString('default', { weekday: 'short' });
-      const day = d.getDate();
-      const isActive = d.toDateString() === date.toDateString();
-      const month = d.toLocaleString('default', { month: 'short' });
-
-      const div = document.createElement("div");
-      div.className = "day-item" + (isActive ? " active" : "");
-      div.dataset.date = iso;
-      div.innerHTML = `
-        <div class="circle">
-            <div class="day-name">${dow}</div>
-            <div class="day-number">${day}</div>
-            ${isActive ? `<div class="day-month">${month}</div>` : ""}
-        </div>
-      `;
-      footer.appendChild(div);
-    }
-  }
-
-  function getWeekNumber(d) {
-    d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
-    d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
-    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-    return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
-  }
-
-  // Загружаем события сразу при загрузке страницы
-  loadEvents();
+// Загружаем события сразу при загрузке страницы
+loadEvents();
 </script>
 </body>
 </html>
