@@ -1,3 +1,11 @@
+.then(data => {
+  if (data.status === "updated") {
+    localStorage.clear(); // <--- добавляем ЭТУ строку
+    loadEvents();
+  }
+
+
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
