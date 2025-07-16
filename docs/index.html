@@ -179,37 +179,46 @@
     const view = ec.getOption('view');
     const currentDateStr = ec.getOption('date');
     const currentDate = new Date(currentDateStr);
-
     let start, end;
 
     if (view === 'dayGridMonth') {
       start = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
       end = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0, 23, 59, 59);
     } else if (view === 'resourceTimeGridDay' || view === 'listWeek') {
-      start = new Date(currentDate);
-      start.setHours(0, 0, 0, 0);
-      end = new Date(currentDate);
-      end.setHours(23, 59, 59, 999);
+      start = new Date(currentDate); start.setHours(0, 0, 0, 0);
+      end = new Date(currentDate); end.setHours(23, 59, 59, 999);
     } else if (view === 'resourceTimeGridWeek' || view === 'resourceTimelineWeek') {
       const day = currentDate.getDay();
       const diffToMonday = (day + 6) % 7;
-      start = new Date(currentDate);
-      start.setDate(currentDate.getDate() - diffToMonday);
+      start = new Date(currentDate); start.setDate(currentDate.getDate() - diffToMonday);
       start.setHours(0, 0, 0, 0);
-      end = new Date(start);
-      end.setDate(start.getDate() + 6);
+      end = new Date(start); end.setDate(start.getDate() + 6);
       end.setHours(23, 59, 59, 999);
     } else {
       start = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
       end = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0, 23, 59, 59);
     }
-
     return { start, end };
   }
 
   async function loadEvents() {
     try {
       const range = getVisibleRange();
+      const rangeKey = `events-${range.start.toISOString()}-${range.end.toISOString()}`;
+      const cached = localStorage.getItem(rangeKey);
+
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        const now = Date.now();
+        if (now < parsed.expiresAt) {
+          ec.setOption('events', parsed.events);
+          updateTitle();
+          return;
+        } else {
+          localStorage.removeItem(rangeKey);
+        }
+      }
+
       const calendars = [
         { calendar: 'master1', resourceId: 2 },
         { calendar: 'master2', resourceId: 1 }
@@ -233,23 +242,21 @@
         });
 
         if (!response.ok) throw new Error('Network error');
-
         const events = await response.json();
+
         for (const ev of events) {
           ev.resourceId = cal.resourceId;
           ev.calendar = cal.calendar;
-
-          if (cal.calendar === 'master1') {
-            ev.color = '#007bff'; // синий
-          } else if (cal.calendar === 'master2') {
-            ev.color = '#28a745'; // зелёный
-          }
-
+          ev.color = cal.calendar === 'master1' ? '#007bff' : '#28a745';
           allEvents.push(ev);
         }
       }
 
       ec.setOption('events', allEvents);
+      localStorage.setItem(rangeKey, JSON.stringify({
+        events: allEvents,
+        expiresAt: Date.now() + 10 * 60 * 1000
+      }));
       updateTitle();
     } catch (error) {
       console.error('Ошибка загрузки событий:', error);
@@ -257,7 +264,6 @@
     }
   }
 
-  // Остальной скрипт
   ec.setOption("dateClick", function(info) {
     lastClickedDate = info.dateStr;
     lastTapTime = Date.now();
@@ -349,10 +355,7 @@
 
     if (newTitle === "") {
       if (confirm("Удалить событие?")) {
-        const params = new URLSearchParams({
-          action: "delete",
-          id: event.id
-        });
+        const params = new URLSearchParams({ action: "delete", id: event.id });
         fetch(GAS_URL, {
           method: "POST",
           headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
@@ -501,11 +504,11 @@
     }
   }
 
-  function getWeekNumber(d) {
+    function getWeekNumber(d) {
     d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
     d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
     const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-        return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+    return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
   }
 
   // Загружаем события сразу
