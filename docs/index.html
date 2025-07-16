@@ -238,6 +238,13 @@
         for (const ev of events) {
           ev.resourceId = cal.resourceId;
           ev.calendar = cal.calendar;
+
+          if (cal.calendar === 'master1') {
+            ev.color = '#007bff'; // синий
+          } else if (cal.calendar === 'master2') {
+            ev.color = '#28a745'; // зелёный
+          }
+
           allEvents.push(ev);
         }
       }
@@ -250,10 +257,15 @@
     }
   }
 
-  const calendarEl = document.getElementById("ec");
-  const hammer = new Hammer(calendarEl);
-  hammer.get("doubletap").set({ interval: 300 });
+  // Остальной скрипт
+  ec.setOption("dateClick", function(info) {
+    lastClickedDate = info.dateStr;
+    lastTapTime = Date.now();
+    loadEvents();
+  });
 
+  const hammer = new Hammer(document.getElementById("ec"));
+  hammer.get("doubletap").set({ interval: 300 });
   hammer.on("doubletap", function () {
     if (lastClickedDate && Date.now() - lastTapTime < 600) {
       ec.setOption("date", lastClickedDate);
@@ -301,13 +313,6 @@
     }
   });
 
-  ec.setOption("dateClick", function(info) {
-    lastClickedDate = info.dateStr;
-    lastTapTime = Date.now();
-    loadEvents();
-  });
-
-  // --- Создание события с синхронизацией на сервер (application/x-www-form-urlencoded)
   function createEventPrompt(selectInfo) {
     const title = prompt("Введите название нового события:", "");
     if (!title) return;
@@ -338,7 +343,6 @@
     });
   }
 
-  // --- Редактирование или удаление события с синхронизацией на сервер (application/x-www-form-urlencoded)
   function editEventPrompt(event) {
     const newTitle = prompt("Редактировать название события:", event.title);
     if (newTitle === null) return;
@@ -501,7 +505,7 @@
     d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
     d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
     const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-    return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+        return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
   }
 
   // Загружаем события сразу
