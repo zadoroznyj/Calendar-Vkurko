@@ -364,6 +364,7 @@
         .then(res => res.json())
         .then(data => {
           if (data.status === "deleted") {
+            localStorage.clear();
             loadEvents();
           } else {
             alert("Ошибка удаления события: " + (data.message || "неизвестная ошибка"));
@@ -392,11 +393,10 @@
     })
     .then(res => res.json())
     .then(data => {
-      .then(data => {
-  if (data.status === "updated") {
-    localStorage.clear(); // <--- добавляем ЭТУ строку
-    loadEvents();
-  } else {
+      if (data.status === "updated") {
+        localStorage.clear();
+        loadEvents();
+      } else {
         alert("Ошибка обновления события: " + (data.message || "неизвестная ошибка"));
       }
     })
@@ -480,7 +480,7 @@
     footer.innerHTML = "";
 
     const startOfWeek = new Date(date);
-    startOfWeek.setDate(date.getDate() - ((date.getDay() + 6) % 7)); // Monday
+    startOfWeek.setDate(date.getDate() - ((date.getDay() + 6) % 7));
 
     for (let i = 0; i < 7; i++) {
       const d = new Date(startOfWeek);
@@ -500,13 +500,13 @@
             <div class="day-name">${dow}</div>
             <div class="day-number">${day}</div>
             ${isActive ? `<div class="day-month">${month}</div>` : ""}
-        </div>
+                </div>
       `;
       footer.appendChild(div);
     }
   }
 
-    function getWeekNumber(d) {
+  function getWeekNumber(d) {
     d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
     d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
     const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
