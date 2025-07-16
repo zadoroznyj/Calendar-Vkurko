@@ -1,1 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>EventCalendar</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@event-calendar/build@4.5.0/dist/event-calendar.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@event-calendar/build@4.5.0/dist/event-calendar.min.js"></script>
+  <script src="https://hammerjs.github.io/dist/hammer.min.js"></script>
+  <style>
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #fff;
+      color: #000;
+    }
+    header, footer {
+      padding: 8px 16px;
+      background: #fff;
+    }
+    .mode-switcher {
+      display: flex;
+      justify-content: space-around;
+      font-size: 16px;
+      padding: 8px 0;
+      font-weight: 500;
+    }
+    .mode-switcher span {
+      color: #555;
+      cursor: pointer;
+      padding: 4px 12px;
+      border-radius: 16px;
+      transition: background 0.2s, color 0.2s;
+    }
+    .mode-switcher .active {
+      background: #000;
+      color: #fff;
+      font-weight: 600;
+    }
+    .calendar-title {
+      font-size: 22px;
+      font-weight: 600;
+      padding: 4px 16px;
+    }
+    .calendar-subtitle {
+      font-size: 14px;
+      padding-left: 16px;
+      color: #999;
+    }
+    .month-footer {
+      display: flex;
+      justify-content: space-around;
+      font-size: 16px;
+      padding: 10px 0px;
+    }
+    .month-footer span {
+      color: #664;
+      cursor: pointer;
+      padding: 4px 12px;
+      border-radius: 16px;
+    }
+    .month-footer span.active {
+      background: #000;
+      color: #fff;
+    }
+    .month-footer span.current-month {
+      color: #005aff;
+      font-weight: 600;
+    }
+    #ec {
+      width: 100%;
+      height: calc(100vh - 200px);
+    }
+    .day-footer {
+      display: flex;
+      justify-content: space-around;
+      padding: 8px 0;
+      background: #fff;
+      font-size: 14px;
+    }
+    .day-footer .day-item {
+      flex: 1;
+      text-align: center;
+      cursor: pointer;
+      color: #664;
+    }
+    .day-footer .circle {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      width: 56px;
+      height: 42px;
+      border-radius: 21px;
+      transition: background 0.2s, color 0.2s;
+    }
+    .day-footer .active .circle {
+      background: #000;
+      color: #fff;
+    }
+    .day-footer .day-name {
+      font-size: 11px;
+      line-height: 1;
+    }
+    .day-footer .day-number {
+      font-size: 15px;
+      font-weight: 600;
+      line-height: 1;
+    }
+    .day-footer .day-month {
+      font-size: 10px;
+      line-height: 1;
+      margin-top: 2px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="mode-switcher" id="modeSwitcher">
+      <span data-view="listWeek">List</span>
+      <span data-view="resourceTimeGridDay">Day</span>
+      <span data-view="resourceTimeGridWeek">Week</span>
+      <span data-view="dayGridMonth" class="active">Month</span>
+      <span data-view="resourceTimelineWeek">Planner</span>
+    </div>
+    <div class="calendar-title" id="calendarTitle">July 2025</div>
+    <div class="calendar-subtitle" id="calendarSubtitle"></div>
+  </header>
 
+  <main>
+    <div id="ec"></div>
+  </main>
+
+  <footer>
+    <div class="month-footer" id="monthFooter"></div>
+    <div class="day-footer" id="dayFooter" style="display: none;"></div>
+  </footer>
+
+<script>
+  let touchStartX = 0;
+  let touchEndX = 0;
+  let lastClickedDate = null;
+  let lastTapTime = 0;
+
+  const GAS_URL = 'https://script.google.com/macros/s/AKfycbwCwrzEehAXbciAZIa-HfrL47Ar_rxNRmM3ShG9nVXJpsZ6Jgt3roG0vX7Ot1g0Ooc/exec';
+
+  const ec = EventCalendar.create(document.getElementById("ec"), {
+    view: "dayGridMonth",
+    firstDay: 1,
+    timeFormat: 'HH:mm',
+    headerToolbar: false,
+    height: "100%",
+    date: new Date().toISOString().slice(0, 10),
+    resources: [
+      { id: 1, title: "Ирина" },
+      { id: 2, title: "Наталья" },
+    ],
+    events: [],
+    nowIndicator: true,
+    selectable: true,
+    dayMaxEvents: true,
+    scrollTime: "08:00:00",
+    slotMinTime: "00:00:00",
+    slotMaxTime: "24:00:00",
+    slotLabelFormat: {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    },
+    select: function(info) {
+      createEventPrompt(info);
+    },
+    eventClick: function(info) {
+      editEventPrompt(info.event);
+    }
+  });
+
+  // Метка для хранения сроков жизни кэша
+  const CACHE_META_KEY = 'events-cache-meta';
+
+  // Получить кэш-мета объект из localStorage
+  function getCacheMeta() {
+    try {
+      return JSON.parse(localStorage.getItem(CACHE_META_KEY)) || {};
+    } catch {
+      return {};
+    }
+  }
+
+  // Сохранить кэш-мета объект в localStorage
+  function setCacheMeta(meta) {
+    localStorage.setItem(CACHE_META_KEY, JSON.stringify(meta));
+  }
+
+  // Удалить кэш для указанного ключа
+  function clearCacheForKey(key) {
+    localStorage.removeItem(key);
+    const meta = getCacheMeta();
+    if (meta[key]) {
+      delete meta[key];
+      setCacheMeta(meta);
+    }
+  }
+
+  // Очистить ВСЕ кэши событий (только события, не весь localStorage)
+  function clearAllEventsCache() {
+    const meta = getCacheMeta();
+    for (const key in meta) {
+      if (key.startsWith('events-')) {
+        localStorage.removeItem(key);
+        delete meta[key];
+      }
+    }
+    setCacheMeta(meta);
+  }
+
+  function getVisibleRange() {
+    const view = ec.getOption('view');
+    const currentDateStr = ec.getOption('date');
+    const currentDate = new Date(currentDateStr);
+    let start, end;
+
+    if (view === 'dayGridMonth') {
+      start = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+      end = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0, 23, 59, 59);
+    } else if (view === 'resourceTimeGridDay' || view === 'listWeek') {
+      start = new Date(currentDate); start.setHours(0, 0, 0, 0);
+      end = new Date(currentDate); end.setHours(23, 59, 59, 999);
+    } else if (view === 'resourceTimeGridWeek' || view === 'resourceTimelineWeek') {
+      const day = currentDate.getDay();
+      const diffToMonday = (day + 6) % 7;
+      start = new Date(currentDate); start.setDate(currentDate.getDate() - diffToMonday);
+      start.setHours(0, 0, 0, 0);
+      end = new Date(start); end.setDate(start.getDate() + 6);
+      end.setHours(23, 59, 59, 999);
+    } else {
+      start = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+      end = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0, 23, 59, 59);
+    }
+    return { start, end };
+  }
+
+  async function loadEvents() {
+    try {
+      const range = getVisibleRange();
+      const rangeKey = `events-${range.start.toISOString()}-${range.end.toISOString()}`;
+      const meta = getCacheMeta();
+      const now = Date.now();
+
+      if (localStorage.getItem(rangeKey) && meta[rangeKey] && now < meta[rangeKey].expiresAt) {
+        const cachedEvents = JSON.parse(localStorage.getItem(rangeKey));
+        ec.setOption('events', cachedEvents);
+        updateTitle();
+        return;
+      } else {
+        // Если устарел кэш — удаляем старые данные
+        clearCacheForKey(rangeKey);
+      }
+
+      const calendars = [
+        { calendar: 'master1', resourceId: 2 },
+        { calendar: 'master2', resourceId: 1 }
+      ];
+      const allEvents = [];
+
+      for (const cal of calendars) {
+        const params = new URLSearchParams({
+          action: 'get',
+          start: range.start.toISOString(),
+          end: range.end.toISOString(),
+          calendar: cal.calendar
+        });
+
+        const response = await fetch(GAS_URL, {
+          method: 'POST',
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"
+          },
+          body: params.toString()
+        });
+
+        if (!response.ok) throw new Error('Network error');
+        const events = await response.json();
+
+        for (const ev of events) {
+          ev.resourceId = cal.resourceId;
+          ev.calendar = cal.calendar;
+          ev.color = cal.calendar === 'master1' ? '#007bff' : '#28a745';
+          allEvents.push(ev);
+        }
+      }
+
+      ec.setOption('events', allEvents);
+
+      // Сохраняем в кэш и обновляем meta с TTL 10 минут
+      localStorage.setItem(rangeKey, JSON.stringify(allEvents));
+      meta[rangeKey] = { expiresAt: now + 10 * 60 * 1000 };
+      setCacheMeta(meta);
+
+      updateTitle();
+    } catch (error) {
+      console.error('Ошибка загрузки событий:', error);
+      alert('Ошибка загрузки событий: ' + error.message);
+    }
+  }
+
+  ec.setOption("dateClick", function(info) {
+    lastClickedDate = info.dateStr;
+    lastTapTime = Date.now();
+    loadEvents();
+  });
+
+  const hammer = new Hammer(document.getElementById("ec"));
+  hammer.get("doubletap").set({ interval: 300 });
+  hammer.on("doubletap", function () {
+    if (lastClickedDate && Date.now() - lastTapTime < 600) {
+      ec.setOption("date", lastClickedDate);
+      ec.setOption("view", "resourceTimeGridDay");
+      updateActiveMode("resourceTimeGridDay");
+      loadEvents();
+      updateTitle();
+    }
+  });
+
+  document.addEventListener("touchstart", e => {
+    touchStartX = e.changedTouches[0].screenX;
+  });
+
+  document.addEventListener("touchend", e => {
+    touchEndX = e.changedTouches[0].screenX;
+    let delta = touchEndX - touchStartX;
+    if (Math.abs(delta) > 50) {
+      if (delta > 0) ec.prev();
+      else ec.next();
+      loadEvents();
+      updateTitle();
+    }
+  });
+
+  document.getElementById("modeSwitcher").addEventListener("click", (e) => {
+    if (e.target.dataset.view) {
+      const currentDate = ec.getOption("date");
+      ec.setOption("date", currentDate);
+      ec.setOption("view", e.target.dataset.view);
+      updateActiveMode(e.target.dataset.view);
+      loadEvents();
+      updateTitle();
+    }
+  });
+
+  document.getElementById("dayFooter").addEventListener("click", (e) => {
+    const item = e.target.closest('.day-item');
+    if (item && item.dataset.date) {
+      ec.setOption("date", item.dataset.date);
+      ec.setOption("view", "resourceTimeGridDay");
+      updateActiveMode("resourceTimeGridDay");
+      loadEvents();
+      updateTitle();
+    }
+  });
+
+  function createEventPrompt(selectInfo) {
+    const title = prompt("Введите название нового события:", "");
+    if (!title) return;
+
+    const params = new URLSearchParams({
+      action: "create",
+      title: title,
+      startTime: selectInfo.startStr,
+      endTime: selectInfo.endStr
+    });
+
+    fetch(GAS_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
+      body: params.toString()
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.status === "created") {
+        clearAllEventsCache();
+        loadEvents();
+      } else {
+        alert("Ошибка создания события: " + (data.message || "неизвестная ошибка"));
+      }
+    })
+    .catch(err => {
+      console.error("Ошибка отправки create:", err);
+      alert("Ошибка отправки create: " + err.message);
+    });
+  }
+
+  function editEventPrompt(event) {
+    const newTitle = prompt("Редактировать название события:", event.title);
+    if (newTitle === null) return;
+
+    if (newTitle === "") {
+      if (confirm("Удалить событие?")) {
+        const params = new URLSearchParams({ action: "delete", id: event.id });
+        fetch(GAS_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
+          body: params.toString()
+        })
+        .then(res => res.json())
+        .then(data => {
+          if (data.status === "deleted") {
+            clearAllEventsCache();
+            loadEvents();
+          } else {
+            alert("Ошибка удаления события: " + (data.message || "неизвестная ошибка"));
+          }
+        })
+        .catch(err => {
+          console.error("Ошибка удаления:", err);
+          alert("Ошибка удаления: " + err.message);
+        });
+      }
+      return;
+    }
+
+    const params = new URLSearchParams({
+      action: "update",
+      id: event.id,
+      title: newTitle,
+      startTime: event.start.toISOString().replace("Z",""),
+      endTime: event.end ? event.end.toISOString().replace("Z","") : ""
+    });
+
+    fetch(GAS_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
+      body: params.toString()
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.status === "updated") {
+        clearAllEventsCache();
+        loadEvents();
+      } else {
+        alert("Ошибка обновления события: " + (data.message || "неизвестная ошибка"));
+      }
+    })
+    .catch(err => {
+      console.error("Ошибка отправки update:", err);
+      alert("Ошибка отправки update: " + err.message);
+    });
+  }
+
+  function updateActiveMode(viewName) {
+    document.querySelectorAll("#modeSwitcher span").forEach(el => {
+      el.classList.toggle("active", el.dataset.view === viewName);
+    });
+    document.getElementById("dayFooter").style.display = viewName === "resourceTimeGridDay" ? "flex" : "none";
+    document.getElementById("monthFooter").style.display = viewName === "resourceTimeGridDay" ? "none" : "flex";
+  }
+
+  function updateTitle() {
+    const dateStr = ec.getOption("date");
+    const date = new Date(dateStr);
+    const view = ec.getOption("view");
+
+    const day = date.getDate();
+    const dow = date.toLocaleString('default', { weekday: 'long' });
+    const monthShort = date.toLocaleString('default', { month: 'short' });
+
+    if (view === "resourceTimeGridDay") {
+      document.getElementById("calendarTitle").textContent = `${dow}, ${day} ${monthShort}`;
+      document.getElementById("calendarSubtitle").textContent = `Week ${getWeekNumber(date)}`;
+      updateDayFooterWithDates(date);
+    } else {
+      const month = date.toLocaleString('default', { month: 'long' });
+      const year = date.getFullYear();
+      document.getElementById("calendarTitle").textContent = `${month} ${year}`;
+      document.getElementById("calendarSubtitle").textContent = ``;
+    }
+
+    updateMonthFooter(date);
+  }
+
+  function updateMonthFooter(currentDate) {
+    const footer = document.getElementById("monthFooter");
+    const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    const today = new Date();
+    const currentMonthIndex = currentDate.getMonth();
+    const currentYear = currentDate.getFullYear();
+
+    footer.innerHTML = "";
+
+    for (let i = -3; i <= 3; i++) {
+      const date = new Date(currentYear, currentMonthIndex + i, 1);
+            const index = date.getMonth();
+      const year = date.getFullYear();
+
+      const span = document.createElement("span");
+      span.textContent = months[index];
+      span.dataset.month = index;
+      span.classList.toggle("active", i === 0);
+
+      const isTodayMonth = index === today.getMonth() && year === today.getFullYear();
+      const isSelected = i === 0;
+
+      if (isTodayMonth && !isSelected) {
+        span.classList.add("current-month");
+      }
+
+      span.addEventListener("click", () => {
+        const newDate = new Date(currentYear, index, 1);
+        ec.setOption("date", newDate.toISOString().slice(0, 10));
+        ec.setOption("view", "dayGridMonth");
+        loadEvents();
+        updateTitle();
+      });
+
+      footer.appendChild(span);
+    }
+  }
+
+  function updateDayFooterWithDates(date) {
+    const footer = document.getElementById("dayFooter");
+    footer.innerHTML = "";
+
+    const startOfWeek = new Date(date);
+    startOfWeek.setDate(date.getDate() - ((date.getDay() + 6) % 7));
+
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(startOfWeek);
+      d.setDate(d.getDate() + i);
+      const iso = d.toISOString().slice(0, 10);
+
+      const dow = d.toLocaleString('default', { weekday: 'short' });
+      const day = d.getDate();
+      const isActive = d.toDateString() === date.toDateString();
+      const month = d.toLocaleString('default', { month: 'short' });
+
+      const div = document.createElement("div");
+      div.className = "day-item" + (isActive ? " active" : "");
+      div.dataset.date = iso;
+      div.innerHTML = `
+        <div class="circle">
+            <div class="day-name">${dow}</div>
+            <div class="day-number">${day}</div>
+            ${isActive ? `<div class="day-month">${month}</div>` : ""}
+        </div>
+      `;
+      footer.appendChild(div);
+    }
+  }
+
+  function getWeekNumber(d) {
+    d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+  }
+
+  // Загружаем события сразу при загрузке страницы
+  loadEvents();
+</script>
+</body>
+</html>
