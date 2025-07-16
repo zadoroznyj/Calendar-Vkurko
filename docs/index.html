@@ -155,7 +155,7 @@
       { id: 1, title: "Наталья" },
       { id: 2, title: "Ирина" },
     ],
-    events: [], // загрузим ниже
+    events: [],
     nowIndicator: true,
     selectable: true,
     dayMaxEvents: true,
@@ -210,21 +210,39 @@
   async function loadEvents() {
     try {
       const range = getVisibleRange();
+      const calendars = [
+        { calendar: 'master1', resourceId: 2 },
+        { calendar: 'master2', resourceId: 1 }
+      ];
+      const allEvents = [];
 
-      const params = new URLSearchParams({
-        action: 'get',
-        start: range.start.toISOString(),
-        end: range.end.toISOString()
-      });
+      for (const cal of calendars) {
+        const params = new URLSearchParams({
+          action: 'get',
+          start: range.start.toISOString(),
+          end: range.end.toISOString(),
+          calendar: cal.calendar
+        });
 
-      const response = await fetch(GAS_URL, {
-        method: 'POST',
-        headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
-        body: params.toString()
-      });
-      if (!response.ok) throw new Error('Network response was not ok');
-      const events = await response.json();
-      ec.setOption('events', events);
+        const response = await fetch(GAS_URL, {
+          method: 'POST',
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"
+          },
+          body: params.toString()
+        });
+
+        if (!response.ok) throw new Error('Network error');
+
+        const events = await response.json();
+        for (const ev of events) {
+          ev.resourceId = cal.resourceId;
+          ev.calendar = cal.calendar;
+          allEvents.push(ev);
+        }
+      }
+
+      ec.setOption('events', allEvents);
       updateTitle();
     } catch (error) {
       console.error('Ошибка загрузки событий:', error);
