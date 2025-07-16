@@ -49,10 +49,17 @@ function doPost(e) {
         else if (calendarKey === "master2") resourceId = 1;
         else resourceId = 0;
 
-        const rawEvent = Calendar.Events.get(calendarId, ev.getId());
-        const eventId = rawEvent.extendedProperties && rawEvent.extendedProperties.private && rawEvent.extendedProperties.private.eventId
-          ? rawEvent.extendedProperties.private.eventId
-          : ev.getId();
+        let eventId = "";
+        try {
+          const rawEvent = Calendar.Events.get(calendarId, ev.getId());
+          eventId = rawEvent.extendedProperties &&
+                    rawEvent.extendedProperties.private &&
+                    rawEvent.extendedProperties.private.eventId
+                      ? rawEvent.extendedProperties.private.eventId
+                      : rawEvent.id || ev.getId();
+        } catch (e) {
+          eventId = ev.getId();
+        }
 
         return {
           id: eventId,
@@ -108,15 +115,26 @@ function doPost(e) {
     if (data.action === "update") {
       if (!data.id) throw new Error("No event id for update");
 
+      let event;
+      let eventId = "";
+
+      // Пытаемся найти по privateExtendedProperty
       const events = Calendar.Events.list(calendarId, {
         privateExtendedProperty: "eventId=" + data.id
       });
 
-      if (!events.items || events.items.length === 0) {
-        throw new Error("Event not found: " + data.id);
+      if (events.items && events.items.length > 0) {
+        event = events.items[0];
+        eventId = event.id;
+      } else {
+        // Если не найдено — пробуем напрямую по ID
+        try {
+          event = Calendar.Events.get(calendarId, data.id);
+          eventId = data.id;
+        } catch (err) {
+          throw new Error("Event not found for update: " + data.id);
+        }
       }
-
-      const event = events.items[0];
 
       event.summary = data.title || event.summary;
       event.start.dateTime = data.startTime;
@@ -127,7 +145,7 @@ function doPost(e) {
       if (data.description !== undefined) event.description = data.description;
       if (data.location !== undefined) event.location = data.location;
 
-      Calendar.Events.patch(event, calendarId, event.id);
+      Calendar.Events.patch(event, calendarId, eventId);
 
       return ContentService
         .createTextOutput(JSON.stringify({ status: "updated", id: data.id }))
@@ -137,16 +155,23 @@ function doPost(e) {
     if (data.action === "delete") {
       if (!data.id) throw new Error("No event id for deletion");
 
+      let eventId = "";
+
       const events = Calendar.Events.list(calendarId, {
         privateExtendedProperty: "eventId=" + data.id
       });
 
-      if (!events.items || events.items.length === 0) {
-        throw new Error("Event not found for deletion: " + data.id);
+      if (events.items && events.items.length > 0) {
+        eventId = events.items[0].id;
+      } else {
+        eventId = data.id; // пробуем удалить напрямую
       }
 
-      const eventId = events.items[0].id;
-      Calendar.Events.remove(calendarId, eventId);
+      try {
+        Calendar.Events.remove(calendarId, eventId);
+      } catch (err) {
+        throw new Error("Failed to delete event: " + eventId + " (" + err.message + ")");
+      }
 
       return ContentService
         .createTextOutput(JSON.stringify({ status: "deleted", id: data.id }))
