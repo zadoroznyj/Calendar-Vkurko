@@ -1,6 +1,200 @@
-Ошибка обновления события: Event not found: 3elnq3t4lckbhffn6ikkc5lh0o
-Ошибка обновления события: Event not found: jq5nqqf43198k9krg7enq80k5o
+const CALENDAR_MAP = {
+  master1: 'irina.salon11@gmail.com',
+  master2: 'primary'
+};
 
+function doGet(e) {
+  return ContentService.createTextOutput(JSON.stringify({ status: 'ok' }))
+    .setMimeType(ContentService.MimeType.JSON)
+    .setHeader('Access-Control-Allow-Origin', '*')
+    .setHeader('Access-Control-Allow-Methods', 'POST')
+    .setHeader('Access-Control-Allow-Headers', 'Content-Type');
+}
+
+function doPost(e) {
+  const params = parsePostData(e);
+  const action = params.action;
+
+  Logger.log('Received action: ' + action);
+  Logger.log(JSON.stringify(params));
+
+  let result = {};
+
+  try {
+    switch (action) {
+      case 'get':
+        result = handleGetEvents(params);
+        break;
+      case 'create':
+        result = handleCreateEvent(params);
+        break;
+      case 'update':
+        result = handleUpdateEvent(params);
+        break;
+      case 'delete':
+        result = handleDeleteEvent(params);
+        break;
+      default:
+        result = { error: 'Unknown action: ' + action };
+    }
+  } catch (error) {
+    Logger.log('ERROR: ' + error.toString());
+    result = { error: error.toString() };
+  }
+
+  return ContentService.createTextOutput(JSON.stringify(result))
+    .setMimeType(ContentService.MimeType.JSON)
+    .setHeader('Access-Control-Allow-Origin', '*')
+    .setHeader('Access-Control-Allow-Methods', 'POST')
+    .setHeader('Access-Control-Allow-Headers', 'Content-Type');
+}
+
+function parsePostData(e) {
+  const raw = e.postData.getDataAsString();
+  const data = {};
+  raw.split('&').forEach(pair => {
+    const [key, value] = pair.split('=').map(decodeURIComponent);
+    data[key] = value;
+  });
+  return data;
+}
+
+function handleGetEvents(params) {
+  const timeZone = Session.getScriptTimeZone();
+  const now = new Date();
+  const timeMin = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
+  const timeMax = new Date(now.getFullYear(), now.getMonth() + 2, 0).toISOString();
+  let allEvents = [];
+
+  for (const key in CALENDAR_MAP) {
+    const calendarId = CALENDAR_MAP[key];
+    const events = Calendar.Events.list(calendarId, {
+      timeMin: timeMin,
+      timeMax: timeMax,
+      singleEvents: true,
+      orderBy: 'startTime'
+    }).items;
+
+    if (!events) continue;
+
+    events.forEach(event => {
+      const privateId = event.extendedProperties?.private?.eventId || event.id;
+      allEvents.push({
+        id: privateId,
+        calendarId: calendarId,
+        title: event.summary || '',
+        start: event.start?.dateTime || event.start?.date,
+        end: event.end?.dateTime || event.end?.date,
+        description: event.description || '',
+        location: event.location || '',
+        color: event.colorId || ''
+      });
+    });
+  }
+
+  return allEvents;
+}
+
+function handleCreateEvent(params) {
+  const calendarId = CALENDAR_MAP[params.calendar] || params.calendar;
+  const calendar = CalendarApp.getCalendarById(calendarId);
+  const eventId = Utilities.getUuid();
+
+  const event = Calendar.Events.insert({
+    summary: params.title,
+    description: params.description || '',
+    location: params.location || '',
+    start: {
+      dateTime: params.start
+    },
+    end: {
+      dateTime: params.end
+    },
+    colorId: params.color || '',
+    extendedProperties: {
+      private: {
+        eventId: eventId
+      }
+    }
+  }, calendarId);
+
+  return {
+    status: 'created',
+    id: eventId,
+    calendarId: calendarId
+  };
+}
+
+function handleUpdateEvent(params) {
+  const calendarId = params.calendarId;
+  const calendar = CalendarApp.getCalendarById(calendarId);
+  const allEvents = Calendar.Events.list(calendarId, {
+    timeMin: new Date(2000, 0, 1).toISOString(),
+    timeMax: new Date(2100, 0, 1).toISOString(),
+    showDeleted: false
+  }).items;
+
+  const event = allEvents.find(ev => {
+    const privateId = ev.extendedProperties?.private?.eventId;
+    return privateId === params.id || ev.id === params.id;
+  });
+
+  if (!event) {
+    throw new Error('Event not found: ' + params.id);
+  }
+
+  const updatedEvent = {
+    summary: params.title,
+    description: params.description || '',
+    location: params.location || '',
+    start: {
+      dateTime: params.start
+    },
+    end: {
+      dateTime: params.end
+    },
+    colorId: params.color || '',
+    extendedProperties: {
+      private: {
+        eventId: event.extendedProperties?.private?.eventId || event.id
+      }
+    }
+  };
+
+  Calendar.Events.patch(updatedEvent, calendarId, event.id);
+
+  return {
+    status: 'updated',
+    id: updatedEvent.extendedProperties.private.eventId,
+    calendarId: calendarId
+  };
+}
+
+function handleDeleteEvent(params) {
+  const calendarId = params.calendarId;
+  const allEvents = Calendar.Events.list(calendarId, {
+    timeMin: new Date(2000, 0, 1).toISOString(),
+    timeMax: new Date(2100, 0, 1).toISOString(),
+    showDeleted: false
+  }).items;
+
+  const event = allEvents.find(ev => {
+    const privateId = ev.extendedProperties?.private?.eventId;
+    return privateId === params.id || ev.id === params.id;
+  });
+
+  if (!event) {
+    throw new Error('Event not found: ' + params.id);
+  }
+
+  Calendar.Events.remove(calendarId, event.id);
+
+  return {
+    status: 'deleted',
+    id: event.id,
+    calendarId: calendarId
+  };
+}
 
 <!DOCTYPE html>
 <html lang="en">
