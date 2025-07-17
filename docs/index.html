@@ -1,133 +1,194 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>EventCalendar</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@event-calendar/build@4.5.0/dist/event-calendar.min.css" />
-  <script src="https://cdn.jsdelivr.net/npm/@event-calendar/build@4.5.0/dist/event-calendar.min.js"></script>
-  <style>
-    html, body {
-      margin: 0;
-      padding: 0;
-      font-family: sans-serif;
-    }
-    #calendar {
-      height: 100vh;
-    }
-  </style>
-</head>
-<body>
-  <div id="calendar"></div>
-  <script>
-    const GAS_URL = 'https://script.google.com/macros/s/PASTE_YOUR_DEPLOYED_URL_HERE/exec';
+const CALENDAR_MAP = {
+  "master1": "irina.salon11@gmail.com",
+  "master2": "primary"
+};
 
-    const ec = new EventCalendar(document.getElementById("calendar"), {
-      view: "month",
-      dragToCreate: true,
-      dragToMove: true,
-      dragToResize: true,
-      selectable: true,
-      eventClick: onEventClick,
-      eventCreate: onEventCreate,
-      eventUpdate: onEventUpdate,
-      eventDelete: onEventDelete
+function formatDateToLocal(date, timeZone) {
+  return Utilities.formatDate(date, timeZone, "yyyy-MM-dd'T'HH:mm:ss");
+}
+
+function formatDateOnly(date, timeZone) {
+  return Utilities.formatDate(date, timeZone, "yyyy-MM-dd");
+}
+
+function doPost(e) {
+  try {
+    const headers = {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type"
+    };
+
+    if (!e || !e.postData || !e.postData.contents) {
+      return ContentService.createTextOutput(
+        JSON.stringify({ status: "error", message: "No postData" })
+      )
+        .setMimeType(ContentService.MimeType.JSON)
+        .setHeaders(headers);
+    }
+
+    const data = {};
+    e.postData.contents.split("&").forEach(pair => {
+      const [k, v] = pair.split("=");
+      data[decodeURIComponent(k)] = decodeURIComponent(v || "");
     });
 
-    function getVisibleRange() {
-      const view = ec.getView();
-      const start = new Date(view.start);
-      const end = new Date(view.end);
-      return { start, end };
+    if (!data.action) {
+      return ContentService.createTextOutput(
+        JSON.stringify({ status: "error", message: "No action specified" })
+      )
+        .setMimeType(ContentService.MimeType.JSON)
+        .setHeaders(headers);
     }
 
-    async function loadEvents() {
-      try {
-        const range = getVisibleRange();
-        const rangeKey = `events-${range.start.toISOString()}-${range.end.toISOString()}`;
-        const cached = localStorage.getItem(rangeKey);
+    const calendarKey = data.calendar || "master1";
+    const calendarId = CALENDAR_MAP[calendarKey];
+    if (!calendarId) {
+      return ContentService.createTextOutput(
+        JSON.stringify({ status: "error", message: "Unknown calendar key: " + calendarKey })
+      )
+        .setMimeType(ContentService.MimeType.JSON)
+        .setHeaders(headers);
+    }
 
-        if (cached) {
-          const parsed = JSON.parse(cached);
-          const now = Date.now();
-          if (now < parsed.expiresAt) {
-            ec.setOption('events', parsed.events);
-            updateTitle();
-            return;
-          } else {
-            localStorage.removeItem(rangeKey);
-          }
-        }
+    const timeZone = Session.getScriptTimeZone();
 
-        const calendars = [
-          { calendar: 'master1', resourceId: 2 },
-          { calendar: 'master2', resourceId: 1 }
-        ];
-        const allEvents = [];
+    if (data.action === "get") {
+      const calendar = CalendarApp.getCalendarById(calendarId);
+      if (!calendar) throw new Error("Calendar not found: " + calendarId);
 
-        for (const cal of calendars) {
-          const params = new URLSearchParams();
-          params.append("action", "get");
-          params.append("start", range.start.toISOString());
-          params.append("end", range.end.toISOString());
-          params.append("calendar", cal.calendar);
+      const fromDate = data.start ? new Date(data.start) : new Date('2025-01-01');
+      const toDate = data.end ? new Date(data.end) : new Date('2026-01-01');
 
-          const response = await fetch(GAS_URL, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"
-            },
-            body: params.toString()
-          });
+      const events = calendar.getEvents(fromDate, toDate).map(ev => {
+        const allDay = ev.isAllDayEvent();
+        const start = allDay ? formatDateOnly(ev.getStartTime(), timeZone) : formatDateToLocal(ev.getStartTime(), timeZone);
+        const end = allDay ? formatDateOnly(ev.getEndTime(), timeZone) : formatDateToLocal(ev.getEndTime(), timeZone);
+        let resourceId = null;
+        if (calendarKey === "master1") resourceId = 2;
+        else if (calendarKey === "master2") resourceId = 1;
+        else resourceId = 0;
 
-          if (!response.ok) throw new Error("Ошибка сети");
+        return {
+          id: ev.getId(),
+          title: ev.getTitle(),
+          start: start,
+          end: end,
+          allDay: allDay,
+          resourceId: resourceId,
+          calendar: calendarKey
+        };
+      });
 
-          const events = await response.json();
+      return ContentService.createTextOutput(JSON.stringify(events))
+        .setMimeType(ContentService.MimeType.JSON)
+        .setHeaders(headers);
+    }
 
-          for (const ev of events) {
-            ev.resourceId = cal.resourceId;
-            ev.calendar = cal.calendar;
-            ev.color = cal.calendar === 'master1' ? '#007bff' : '#28a745';
-            allEvents.push(ev);
-          }
-        }
+    if (data.action === "create") {
+      const start = new Date(data.startTime);
+      const end = new Date(data.endTime);
+      const title = data.title || "Без названия";
+      const description = data.description || "";
+      const location = data.location || "";
 
-        ec.setOption("events", allEvents);
-        localStorage.setItem(rangeKey, JSON.stringify({
-          events: allEvents,
-          expiresAt: Date.now() + 10 * 60 * 1000
-        }));
-        updateTitle();
-      } catch (error) {
-        console.error("Ошибка загрузки событий:", error);
-        alert("Ошибка загрузки событий: " + error.message);
+      function formatDateForApi(date) {
+        return Utilities.formatDate(date, timeZone, "yyyy-MM-dd'T'HH:mm:ss");
       }
+
+      const event = {
+        summary: title,
+        description: description,
+        location: location,
+        start: { dateTime: formatDateForApi(start), timeZone: timeZone },
+        end: { dateTime: formatDateForApi(end), timeZone: timeZone },
+        guestsCanInviteOthers: false,
+        guestsCanSeeOtherGuests: false
+      };
+
+      const createdEvent = Calendar.Events.insert(event, calendarId);
+
+      return ContentService.createTextOutput(JSON.stringify({
+        status: "created",
+        id: createdEvent.id,
+        calendar: calendarKey
+      }))
+        .setMimeType(ContentService.MimeType.JSON)
+        .setHeaders(headers);
     }
 
-    function updateTitle() {
-      document.title = ec.getView().title;
+    if (data.action === "update") {
+      if (!data.id) throw new Error("No event id for update");
+
+      const calendar = CalendarApp.getCalendarById(calendarId);
+      if (!calendar) throw new Error("Calendar not found for update");
+
+      const event = calendar.getEventById(data.id);
+      if (!event) throw new Error("Event not found: " + data.id);
+
+      event.setTitle(data.title || event.getTitle());
+      event.setTime(new Date(data.startTime), new Date(data.endTime));
+      if (data.description !== undefined) event.setDescription(data.description);
+      if (data.location !== undefined) event.setLocation(data.location);
+
+      return ContentService.createTextOutput(JSON.stringify({
+        status: "updated",
+        id: data.id
+      }))
+        .setMimeType(ContentService.MimeType.JSON)
+        .setHeaders(headers);
     }
 
-    function onEventClick({ event }) {
-      alert("Клик по событию: " + event.title);
+    if (data.action === "delete") {
+      if (!data.id) throw new Error("No event id for deletion");
+
+      const calendar = CalendarApp.getCalendarById(calendarId);
+      if (!calendar) throw new Error("Calendar not found for deletion");
+
+      const event = calendar.getEventById(data.id);
+      if (!event) throw new Error("Event not found for deletion: " + data.id);
+
+      event.deleteEvent();
+
+      return ContentService.createTextOutput(JSON.stringify({
+        status: "deleted",
+        id: data.id
+      }))
+        .setMimeType(ContentService.MimeType.JSON)
+        .setHeaders(headers);
     }
 
-    function onEventCreate({ event }) {
-      console.log("Создано событие:", event);
-    }
+    return ContentService.createTextOutput(JSON.stringify({
+      status: "error",
+      message: "Unknown action: " + data.action
+    }))
+      .setMimeType(ContentService.MimeType.JSON)
+      .setHeaders(headers);
 
-    function onEventUpdate({ event }) {
-      console.log("Обновлено событие:", event);
-    }
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({
+      status: "error",
+      message: err.message || err.toString()
+    }))
+      .setMimeType(ContentService.MimeType.JSON)
+      .setHeaders({
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type"
+      });
+  }
+}
 
-    function onEventDelete({ event }) {
-      console.log("Удалено событие:", event);
-    }
-
-    loadEvents();
-  </script>
-</body>
-</html>
+function doGet() {
+  return ContentService
+    .createTextOutput(JSON.stringify({ status: "ok" }))
+    .setMimeType(ContentService.MimeType.JSON)
+    .setHeaders({
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type"
+    });
+}
 
 
 
