@@ -1,3 +1,117 @@
+const CALENDAR_MAP = {
+  "master1": "irina.salon11@gmail.com",
+  "master2": "primary"
+};
+
+function doPost(e) {
+  const headers = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "POST",
+    "Access-Control-Allow-Headers": "Content-Type"
+  };
+
+  try {
+    const params = JSON.parse(Utilities.newBlob(e.postData.contents).getDataAsString());
+    const action = params.action;
+
+    Logger.log("Action: " + action);
+
+    if (action === "get") {
+      const allEvents = [];
+
+      for (const key in CALENDAR_MAP) {
+        const calendarId = CALENDAR_MAP[key];
+        const events = Calendar.Events.list(calendarId, {
+          timeMin: new Date().toISOString(),
+          maxResults: 2500,
+          singleEvents: true,
+          orderBy: "startTime"
+        });
+
+        if (events.items && events.items.length) {
+          for (const event of events.items) {
+            const eventId = (event.extendedProperties && event.extendedProperties.private && event.extendedProperties.private.eventId) || event.id;
+
+            allEvents.push({
+              id: eventId,
+              calendarId: calendarId,
+              title: event.summary,
+              start: event.start.dateTime || event.start.date,
+              end: event.end.dateTime || event.end.date,
+              description: event.description || "",
+              backgroundColor: event.colorId || ""
+            });
+          }
+        }
+      }
+
+      return ContentService.createTextOutput(JSON.stringify(allEvents))
+        .setMimeType(ContentService.MimeType.JSON)
+        .setHeaders(headers);
+    }
+
+    if (action === "update") {
+      const calendarId = params.calendarId;
+      const originalId = params.extendedEventId || params.originalId;
+      const title = params.title;
+      const description = params.description;
+      const start = params.start;
+      const end = params.end;
+
+      if (!calendarId || !originalId) {
+        throw new Error("Missing calendarId or originalId");
+      }
+
+      Logger.log("Updating in: " + calendarId + " Event ID: " + originalId);
+
+      const event = Calendar.Events.get(calendarId, originalId);
+
+      event.summary = title;
+      event.description = description;
+      event.start = { dateTime: start };
+      event.end = { dateTime: end };
+
+      const updated = Calendar.Events.update(event, calendarId, originalId);
+      Logger.log("Updated: " + updated.id);
+
+      return ContentService.createTextOutput(JSON.stringify({ status: "success" }))
+        .setMimeType(ContentService.MimeType.JSON)
+        .setHeaders(headers);
+    }
+
+    if (action === "delete") {
+      const calendarId = params.calendarId;
+      const originalId = params.extendedEventId || params.originalId;
+
+      if (!calendarId || !originalId) {
+        throw new Error("Missing calendarId or originalId");
+      }
+
+      Logger.log("Deleting from: " + calendarId + " ID: " + originalId);
+      Calendar.Events.remove(calendarId, originalId);
+
+      return ContentService.createTextOutput(JSON.stringify({ status: "deleted" }))
+        .setMimeType(ContentService.MimeType.JSON)
+        .setHeaders(headers);
+    }
+
+    return ContentService.createTextOutput(JSON.stringify({ status: "unknown action" }))
+      .setMimeType(ContentService.MimeType.JSON)
+      .setHeaders(headers);
+  } catch (error) {
+    Logger.log("Error: " + error.message);
+    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: error.message }))
+      .setMimeType(ContentService.MimeType.JSON)
+      .setHeaders(headers);
+  }
+}
+
+
+
+
+
+
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
