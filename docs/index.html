@@ -1,8 +1,213 @@
-Ошибка обновления события: Event not found for update: eagb3645e92rpumu654q7g36cc@google.com
-Ошибка обновления события: Event not found for update: jq5nqqf43198k9krg7enq80k5o@google.com
-Ошибка обновления события: Event not found for update: 3elnq3t4lckbhffn6ikkc5lh0o@google.com
-Ошибка обновления события: Event not found for update: 19jtd5b88413n1jodnnpulko88@google.com
+const CALENDAR_MAP = {
+  "master1": "irina.salon11@gmail.com",
+  "master2": "primary"
+};
 
+function doGet() {
+  return ContentService
+    .createTextOutput(JSON.stringify({ status: 'ok' }))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function doPost(e) {
+  const params = e.postData.contents;
+  const decoded = decodeFormData(params);
+  Logger.log("Получены параметры: " + JSON.stringify(decoded));
+
+  const action = decoded.action;
+  const calendarKey = decoded.calendar || "master2";
+  const calendarId = CALENDAR_MAP[calendarKey];
+  const timeZone = Session.getScriptTimeZone();
+
+  const headers = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "POST",
+    "Access-Control-Allow-Headers": "Content-Type"
+  };
+
+  try {
+    if (action === "get") {
+      const start = new Date(decoded.start);
+      const end = new Date(decoded.end);
+      const events = Calendar.Events.list(calendarId, {
+        timeMin: start.toISOString(),
+        timeMax: end.toISOString(),
+        singleEvents: true,
+        orderBy: "startTime"
+      });
+
+      const items = (events.items || []).map(ev => {
+        const customId = ev.extendedProperties && ev.extendedProperties.private && ev.extendedProperties.private.eventId;
+        return {
+          id: customId || ev.id,
+          title: ev.summary,
+          start: ev.start.dateTime || ev.start.date,
+          end: ev.end.dateTime || ev.end.date,
+          allDay: !ev.start.dateTime,
+          calendar: calendarKey
+        };
+      });
+
+      return ContentService.createTextOutput(JSON.stringify(items))
+        .setMimeType(ContentService.MimeType.JSON)
+        .setHeaders(headers);
+    }
+
+    if (action === "create") {
+      const event = {
+        summary: decoded.title,
+        start: {
+          dateTime: decoded.allDay === "true" ? null : new Date(decoded.start).toISOString(),
+          date: decoded.allDay === "true" ? formatDateOnly(new Date(decoded.start), timeZone) : null
+        },
+        end: {
+          dateTime: decoded.allDay === "true" ? null : new Date(decoded.end).toISOString(),
+          date: decoded.allDay === "true" ? formatDateOnly(new Date(decoded.end), timeZone) : null
+        },
+        extendedProperties: {
+          private: {
+            eventId: decoded.id
+          }
+        }
+      };
+
+      const created = Calendar.Events.insert(event, calendarId);
+      Logger.log("Создано событие: " + JSON.stringify(created));
+      return jsonResponse({ status: 'success', eventId: created.id }, headers);
+    }
+
+    if (action === "update") {
+      const pwaId = decoded.id;
+      Logger.log("Попытка обновить событие с ID: " + pwaId);
+
+      // Получаем все события на дату для поиска по extendedProperties
+      const date = new Date(decoded.start);
+      const rangeStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+      const rangeEnd = new Date(rangeStart);
+      rangeEnd.setDate(rangeEnd.getDate() + 1);
+
+      const events = Calendar.Events.list(calendarId, {
+        timeMin: rangeStart.toISOString(),
+        timeMax: rangeEnd.toISOString(),
+        singleEvents: true,
+        orderBy: "startTime"
+      });
+
+      let eventToUpdate = null;
+
+      if (events.items && events.items.length > 0) {
+        for (let ev of events.items) {
+          if (
+            ev.extendedProperties &&
+            ev.extendedProperties.private &&
+            ev.extendedProperties.private.eventId === pwaId
+          ) {
+            eventToUpdate = ev;
+            break;
+          }
+        }
+      }
+
+      // если не найдено по extendedProperties, пробуем напрямую
+      if (!eventToUpdate) {
+        try {
+          eventToUpdate = Calendar.Events.get(calendarId, pwaId);
+        } catch (err) {
+          Logger.log("Ошибка прямого получения события: " + err.message);
+        }
+      }
+
+      if (!eventToUpdate) {
+        const errorMsg = "Event not found for update: " + pwaId;
+        Logger.log(errorMsg);
+        return jsonResponse({ status: 'error', message: errorMsg }, headers);
+      }
+
+      eventToUpdate.summary = decoded.title;
+      if (decoded.allDay === "true") {
+        eventToUpdate.start = { date: formatDateOnly(new Date(decoded.start), timeZone) };
+        eventToUpdate.end = { date: formatDateOnly(new Date(decoded.end), timeZone) };
+      } else {
+        eventToUpdate.start = { dateTime: new Date(decoded.start).toISOString() };
+        eventToUpdate.end = { dateTime: new Date(decoded.end).toISOString() };
+      }
+
+      const updated = Calendar.Events.update(eventToUpdate, calendarId, eventToUpdate.id);
+      Logger.log("Обновлено событие: " + updated.id);
+      return jsonResponse({ status: 'success' }, headers);
+    }
+
+    if (action === "delete") {
+      const pwaId = decoded.id;
+      Logger.log("Попытка удалить событие с ID: " + pwaId);
+
+      const events = Calendar.Events.list(calendarId, {
+        timeMin: new Date("2000-01-01").toISOString(),
+        timeMax: new Date("2100-01-01").toISOString(),
+        singleEvents: true
+      });
+
+      let eventToDelete = null;
+      for (let ev of events.items || []) {
+        if (
+          ev.extendedProperties &&
+          ev.extendedProperties.private &&
+          ev.extendedProperties.private.eventId === pwaId
+        ) {
+          eventToDelete = ev;
+          break;
+        }
+      }
+
+      // если не найдено по extendedProperties, пробуем напрямую
+      if (!eventToDelete) {
+        try {
+          eventToDelete = Calendar.Events.get(calendarId, pwaId);
+        } catch (err) {
+          Logger.log("Ошибка прямого получения события для удаления: " + err.message);
+        }
+      }
+
+      if (!eventToDelete) {
+        const errorMsg = "Event not found for delete: " + pwaId;
+        Logger.log(errorMsg);
+        return jsonResponse({ status: 'error', message: errorMsg }, headers);
+      }
+
+      Calendar.Events.remove(calendarId, eventToDelete.id);
+      Logger.log("Событие удалено: " + eventToDelete.id);
+      return jsonResponse({ status: 'success' }, headers);
+    }
+
+    return jsonResponse({ status: 'error', message: 'Unknown action' }, headers);
+  } catch (error) {
+    Logger.log("Ошибка в doPost: " + error.message);
+    return jsonResponse({ status: 'error', message: error.message }, headers);
+  }
+}
+
+function jsonResponse(obj, headers) {
+  const output = ContentService.createTextOutput(JSON.stringify(obj));
+  output.setMimeType(ContentService.MimeType.JSON);
+  for (const key in headers) {
+    output.appendHeader(key, headers[key]);
+  }
+  return output;
+}
+
+function decodeFormData(form) {
+  const result = {};
+  const pairs = form.split('&');
+  for (const pair of pairs) {
+    const [key, value] = pair.split('=');
+    result[decodeURIComponent(key)] = decodeURIComponent(value || "");
+  }
+  return result;
+}
+
+function formatDateOnly(date, timeZone) {
+  return Utilities.formatDate(date, timeZone, "yyyy-MM-dd");
+}
 
 
 
