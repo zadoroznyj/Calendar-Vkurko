@@ -1,9 +1,164 @@
-Ошибка обновления события: Event not found: 19jtd5b88413n1jodnnpulko88@google.com
-https://calendar.google.com/calendar/u/0/r/eventedit/MTlqdGQ1Yjg4NDEzbjFqb2RubnB1bGtvODggbGVvbmlkemFkb3Jvem55akBt
-Ошибка обновления события: Event not found: jq5nqqf43198k9krg7enq80k5o@google.com
-https://calendar.google.com/calendar/u/0/r/eventedit/anE1bnFxZjQzMTk4azlrcmc3ZW5xODBrNW8gbGVvbmlkemFkb3Jvem55akBt
-https://calendar.google.com/calendar/u/0/r/eventedit/ZWFnYjM2NDVlOTJycHVtdTY1NHE3ZzM2Y2MgaXJpbmEuc2Fsb24xMUBt
+const CALENDAR_MAP = {
+  "master1": "irina.salon11@gmail.com",
+  "master2": "primary"
+};
 
+function formatDateToLocal(date, timeZone) {
+  return Utilities.formatDate(date, timeZone, "yyyy-MM-dd'T'HH:mm:ss");
+}
+
+function formatDateOnly(date, timeZone) {
+  return Utilities.formatDate(date, timeZone, "yyyy-MM-dd");
+}
+
+function doPost(e) {
+  try {
+    if (!e || !e.postData || !e.postData.contents) {
+      throw new Error("No postData");
+    }
+
+    const data = {};
+    e.postData.contents.split("&").forEach(pair => {
+      const [k, v] = pair.split("=");
+      data[decodeURIComponent(k)] = decodeURIComponent(v || "");
+    });
+
+    if (!data.action) throw new Error("No action specified");
+
+    const calendarKey = data.calendar || "master1";
+    const calendarId = CALENDAR_MAP[calendarKey];
+    if (!calendarId) throw new Error("Unknown calendar key: " + calendarKey);
+
+    const timeZone = Session.getScriptTimeZone();
+
+    if (data.action === "get") {
+      const calendar = CalendarApp.getCalendarById(calendarId);
+      if (!calendar) throw new Error("Calendar not found: " + calendarId);
+
+      const fromDate = data.start ? new Date(data.start) : new Date('2025-01-01');
+      const toDate = data.end ? new Date(data.end) : new Date('2026-01-01');
+
+      const events = calendar.getEvents(fromDate, toDate).map(ev => {
+        const allDay = ev.isAllDayEvent();
+        const start = allDay ? formatDateOnly(ev.getStartTime(), timeZone) : formatDateToLocal(ev.getStartTime(), timeZone);
+        const end = allDay ? formatDateOnly(ev.getEndTime(), timeZone) : formatDateToLocal(ev.getEndTime(), timeZone);
+
+        let resourceId = calendarKey === "master1" ? 2 : (calendarKey === "master2" ? 1 : 0);
+
+        const extendedProps = ev.getTag("eventId") || "";
+        const trueId = extendedProps || ev.getId();
+
+        return {
+          id: trueId,
+          title: ev.getTitle(),
+          start: start,
+          end: end,
+          allDay: allDay,
+          resourceId: resourceId,
+          calendar: calendarKey
+        };
+      });
+
+      return ContentService.createTextOutput(JSON.stringify(events)).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (data.action === "create") {
+      const start = new Date(data.startTime);
+      const end = new Date(data.endTime);
+      const title = data.title || "Без названия";
+      const description = data.description || "";
+      const location = data.location || "";
+
+      function formatDateForApi(date) {
+        return Utilities.formatDate(date, timeZone, "yyyy-MM-dd'T'HH:mm:ss");
+      }
+
+      const rawEventId = Utilities.getUuid(); // уникальный ID
+      const event = {
+        summary: title,
+        description: description,
+        location: location,
+        start: { dateTime: formatDateForApi(start), timeZone: timeZone },
+        end: { dateTime: formatDateForApi(end), timeZone: timeZone },
+        guestsCanInviteOthers: false,
+        guestsCanSeeOtherGuests: false,
+        extendedProperties: {
+          private: {
+            eventId: rawEventId
+          }
+        }
+      };
+
+      const createdEvent = Calendar.Events.insert(event, calendarId);
+
+      return ContentService
+        .createTextOutput(JSON.stringify({ status: "created", id: rawEventId, calendar: calendarKey }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (data.action === "update") {
+      if (!data.id) throw new Error("No event id for update");
+
+      const calendar = CalendarApp.getCalendarById(calendarId);
+      if (!calendar) throw new Error("Calendar not found for update");
+
+      const events = calendar.getEvents(new Date('2025-01-01'), new Date('2026-01-01'));
+      let target = null;
+
+      for (const ev of events) {
+        const tag = ev.getTag("eventId");
+        if (tag === data.id || ev.getId() === data.id) {
+          target = ev;
+          break;
+        }
+      }
+
+      if (!target) throw new Error("Event not found: " + data.id);
+
+      target.setTitle(data.title || target.getTitle());
+      target.setTime(new Date(data.startTime), new Date(data.endTime));
+      if (data.description !== undefined) target.setDescription(data.description);
+      if (data.location !== undefined) target.setLocation(data.location);
+
+      return ContentService
+        .createTextOutput(JSON.stringify({ status: "updated", id: data.id }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (data.action === "delete") {
+      if (!data.id) throw new Error("No event id for deletion");
+
+      const calendar = CalendarApp.getCalendarById(calendarId);
+      if (!calendar) throw new Error("Calendar not found for deletion");
+
+      const events = calendar.getEvents(new Date('2025-01-01'), new Date('2026-01-01'));
+      let target = null;
+
+      for (const ev of events) {
+        const tag = ev.getTag("eventId");
+        if (tag === data.id || ev.getId() === data.id) {
+          target = ev;
+          break;
+        }
+      }
+
+      if (!target) throw new Error("Event not found for deletion: " + data.id);
+
+      target.deleteEvent();
+
+      return ContentService
+        .createTextOutput(JSON.stringify({ status: "deleted", id: data.id }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    throw new Error("Unknown action: " + data.action);
+
+  } catch (err) {
+    return ContentService
+      .createTextOutput(JSON.stringify({ status: "error", message: err.message }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
 
 
 
