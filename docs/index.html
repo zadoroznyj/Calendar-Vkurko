@@ -1,7 +1,176 @@
-Ошибка обновления события: Event not found: oi1dnujpttubrru1vghkpvukog@google.com
-Ошибка обновления события: Event not found: 3elnq3t4lckbhffn6ikkc5lh0o@google.com
-Ошибка обновления события: Event not found: eulm0r5ar7oomfs0ckfun3ptsc@google.com
+const CALENDAR_MAP = {
+  "master1": "irina.salon11@gmail.com",
+  "master2": "primary"
+};
 
+function doPost(e) {
+  const headers = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "POST",
+    "Access-Control-Allow-Headers": "Content-Type"
+  };
+
+  try {
+    const params = JSON.parse(Utilities.newBlob(e.postData.contents).getDataAsString());
+    const action = params.action;
+
+    Logger.log("Action: " + action);
+
+    if (action === "get") {
+      const allEvents = [];
+
+      for (const key in CALENDAR_MAP) {
+        const calendarId = CALENDAR_MAP[key];
+        const events = Calendar.Events.list(calendarId, {
+          timeMin: new Date().toISOString(),
+          maxResults: 2500,
+          singleEvents: true,
+          orderBy: "startTime"
+        });
+
+        if (events.items && events.items.length) {
+          for (const event of events.items) {
+            const eventId = (event.extendedProperties && event.extendedProperties.private && event.extendedProperties.private.eventId) || event.id;
+
+            allEvents.push({
+              id: eventId,
+              calendarId: calendarId,
+              title: event.summary,
+              start: event.start.dateTime || event.start.date,
+              end: event.end.dateTime || event.end.date,
+              description: event.description || "",
+              backgroundColor: event.colorId || ""
+            });
+          }
+        }
+      }
+
+      return ContentService.createTextOutput(JSON.stringify(allEvents))
+        .setMimeType(ContentService.MimeType.JSON)
+        .setHeaders(headers);
+    }
+
+    if (action === "update") {
+      const calendarId = params.calendarId;
+      const originalId = params.originalId;
+      const title = params.title;
+      const description = params.description;
+      const start = params.start;
+      const end = params.end;
+
+      if (!calendarId || !originalId) {
+        throw new Error("Missing calendarId or originalId");
+      }
+
+      Logger.log("Updating in: " + calendarId + " Event ID: " + originalId);
+
+      // Пытаемся получить событие сначала по originalId
+      let event;
+      try {
+        event = Calendar.Events.get(calendarId, originalId);
+      } catch (e) {
+        // Если не найдено — пытаемся найти событие в списке и получить по реальному id
+        Logger.log("Event with ID " + originalId + " not found directly, trying fallback search...");
+
+        const events = Calendar.Events.list(calendarId, {
+          maxResults: 2500,
+          singleEvents: true,
+          orderBy: "startTime"
+        });
+
+        if (events.items && events.items.length) {
+          // Ищем событие, у которого extendedProperties.private.eventId === originalId
+          let fallbackEvent = events.items.find(ev =>
+            ev.extendedProperties &&
+            ev.extendedProperties.private &&
+            ev.extendedProperties.private.eventId === originalId
+          );
+          if (!fallbackEvent) {
+            // Ищем по event.id == originalId
+            fallbackEvent = events.items.find(ev => ev.id === originalId);
+          }
+
+          if (!fallbackEvent) {
+            throw new Error("Event not found in fallback search: " + originalId);
+          }
+
+          // Теперь получаем событие по реальному ID
+          event = Calendar.Events.get(calendarId, fallbackEvent.id);
+        } else {
+          throw new Error("No events found for fallback search");
+        }
+      }
+
+      event.summary = title;
+      event.description = description;
+      event.start = { dateTime: start };
+      event.end = { dateTime: end };
+
+      const updated = Calendar.Events.update(event, calendarId, event.id);
+      Logger.log("Updated: " + updated.id);
+
+      return ContentService.createTextOutput(JSON.stringify({ status: "success" }))
+        .setMimeType(ContentService.MimeType.JSON)
+        .setHeaders(headers);
+    }
+
+    if (action === "delete") {
+      const calendarId = params.calendarId;
+      const originalId = params.originalId;
+
+      if (!calendarId || !originalId) {
+        throw new Error("Missing calendarId or originalId");
+      }
+
+      Logger.log("Deleting from: " + calendarId + " ID: " + originalId);
+
+      // Пытаемся удалить сначала по originalId
+      try {
+        Calendar.Events.remove(calendarId, originalId);
+      } catch (e) {
+        Logger.log("Event with ID " + originalId + " not found directly for deletion, trying fallback search...");
+
+        const events = Calendar.Events.list(calendarId, {
+          maxResults: 2500,
+          singleEvents: true,
+          orderBy: "startTime"
+        });
+
+        if (events.items && events.items.length) {
+          let fallbackEvent = events.items.find(ev =>
+            ev.extendedProperties &&
+            ev.extendedProperties.private &&
+            ev.extendedProperties.private.eventId === originalId
+          );
+          if (!fallbackEvent) {
+            fallbackEvent = events.items.find(ev => ev.id === originalId);
+          }
+
+          if (!fallbackEvent) {
+            throw new Error("Event not found in fallback search for deletion: " + originalId);
+          }
+
+          Calendar.Events.remove(calendarId, fallbackEvent.id);
+        } else {
+          throw new Error("No events found for fallback search for deletion");
+        }
+      }
+
+      return ContentService.createTextOutput(JSON.stringify({ status: "deleted" }))
+        .setMimeType(ContentService.MimeType.JSON)
+        .setHeaders(headers);
+    }
+
+    return ContentService.createTextOutput(JSON.stringify({ status: "unknown action" }))
+      .setMimeType(ContentService.MimeType.JSON)
+      .setHeaders(headers);
+  } catch (error) {
+    Logger.log("Error: " + error.message);
+    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: error.message }))
+      .setMimeType(ContentService.MimeType.JSON)
+      .setHeaders(headers);
+  }
+}
 
 
 <!DOCTYPE html>
