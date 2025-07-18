@@ -23,11 +23,9 @@ function doPost(e) {
       throw new Error("No postData");
     }
 
-    const data = {};
-    e.postData.contents.split("&").forEach(pair => {
-      const [k, v] = pair.split("=");
-      data[decodeURIComponent(k)] = decodeURIComponent(v || "");
-    });
+    // === Изменено здесь ===
+    // Вместо парсинга URLSearchParams теперь парсим JSON из тела запроса
+    const data = JSON.parse(e.postData.contents);
 
     Logger.log("Received data: %s", JSON.stringify(data));
 
