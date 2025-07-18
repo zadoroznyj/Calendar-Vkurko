@@ -1,13 +1,3 @@
-headers: {
-  "Content-Type": "application/json"
-},
-body: JSON.stringify({
-  action: 'get',
-  start: range.start.toISOString(),
-  end: range.end.toISOString(),
-  calendar: cal.calendar
-})
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -286,10 +276,14 @@ body: JSON.stringify({
         const response = await fetch(GAS_URL, {
           method: 'POST',
           headers: {
-            "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"
-          },
-          body: params.toString()
-        });
+  "Content-Type": "application/json"
+},
+body: JSON.stringify({
+  action: 'get',
+  start: range.start.toISOString(),
+  end: range.end.toISOString(),
+  calendar: cal.calendar
+});
 
         if (!response.ok) throw new Error('Network error');
         const events = await response.json();
