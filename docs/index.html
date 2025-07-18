@@ -276,9 +276,9 @@
         const response = await fetch(GAS_URL, {
           method: 'POST',
           headers: {
-            "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"
+            "Content-Type": "application/json"
           },
-          body: params.toString()
+          body: JSON.stringify(Object.fromEntries(params))
         });
 
         if (!response.ok) throw new Error('Network error');
@@ -395,8 +395,8 @@
 
     fetch(GAS_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
-      body: params.toString()
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(Object.fromEntries(params))
     })
     .then(res => res.json())
     .then(data => {
@@ -432,8 +432,8 @@
         const params = new URLSearchParams({ action: "delete", id: event.id });
         fetch(GAS_URL, {
           method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
-          body: params.toString()
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(Object.fromEntries(params))
         })
         .then(res => res.json())
         .then(data => {
@@ -462,8 +462,8 @@
 
     fetch(GAS_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
-      body: params.toString()
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(Object.fromEntries(params))
     })
     .then(res => res.json())
     .then(data => {
@@ -493,111 +493,111 @@
     document.querySelectorAll("#modeSwitcher span").forEach(el => {
       el.classList.toggle("active", el.dataset.view === viewName);
     });
-    document.getElementById("dayFooter").style.display = viewName === "resourceTimeGridDay" ? "flex" : "none";
-    document.getElementById("monthFooter").style.display = viewName === "resourceTimeGridDay" ? "none" : "flex";
+      document.getElementById("dayFooter").style.display = viewName === "resourceTimeGridDay" ? "flex" : "none";
+  document.getElementById("monthFooter").style.display = viewName === "resourceTimeGridDay" ? "none" : "flex";
+}
+
+function updateTitle() {
+  const dateStr = ec.getOption("date");
+  const date = new Date(dateStr);
+  const view = ec.getOption("view");
+
+  const day = date.getDate();
+  const dow = date.toLocaleString('default', { weekday: 'long' });
+  const monthShort = date.toLocaleString('default', { month: 'short' });
+
+  if (view === "resourceTimeGridDay") {
+    document.getElementById("calendarTitle").textContent = `${dow}, ${day} ${monthShort}`;
+    document.getElementById("calendarSubtitle").textContent = `Week ${getWeekNumber(date)}`;
+    updateDayFooterWithDates(date);
+  } else {
+    const month = date.toLocaleString('default', { month: 'long' });
+    const year = date.getFullYear();
+    document.getElementById("calendarTitle").textContent = `${month} ${year}`;
+    document.getElementById("calendarSubtitle").textContent = ``;
   }
 
-  function updateTitle() {
-    const dateStr = ec.getOption("date");
-    const date = new Date(dateStr);
-    const view = ec.getOption("view");
+  updateMonthFooter(date);
+}
 
-    const day = date.getDate();
-    const dow = date.toLocaleString('default', { weekday: 'long' });
-    const monthShort = date.toLocaleString('default', { month: 'short' });
+function updateMonthFooter(currentDate) {
+  const footer = document.getElementById("monthFooter");
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const today = new Date();
+  const currentMonthIndex = currentDate.getMonth();
+  const currentYear = currentDate.getFullYear();
 
-    if (view === "resourceTimeGridDay") {
-      document.getElementById("calendarTitle").textContent = `${dow}, ${day} ${monthShort}`;
-      document.getElementById("calendarSubtitle").textContent = `Week ${getWeekNumber(date)}`;
-      updateDayFooterWithDates(date);
-    } else {
-      const month = date.toLocaleString('default', { month: 'long' });
-      const year = date.getFullYear();
-      document.getElementById("calendarTitle").textContent = `${month} ${year}`;
-      document.getElementById("calendarSubtitle").textContent = ``;
+  footer.innerHTML = "";
+
+  for (let i = -3; i <= 3; i++) {
+    const date = new Date(currentYear, currentMonthIndex + i, 1);
+    const index = date.getMonth();
+    const year = date.getFullYear();
+
+    const span = document.createElement("span");
+    span.textContent = months[index];
+    span.dataset.month = index;
+    span.classList.toggle("active", i === 0);
+
+    const isTodayMonth = index === today.getMonth() && year === today.getFullYear();
+    const isSelected = i === 0;
+
+    if (isTodayMonth && !isSelected) {
+      span.classList.add("current-month");
     }
 
-    updateMonthFooter(date);
+    span.addEventListener("click", () => {
+      const newDate = new Date(currentYear, index, 1);
+      ec.setOption("date", newDate.toISOString().slice(0, 10));
+      ec.setOption("view", "dayGridMonth");
+      loadEvents();
+      updateTitle();
+    });
+
+    footer.appendChild(span);
   }
+}
 
-  function updateMonthFooter(currentDate) {
-    const footer = document.getElementById("monthFooter");
-    const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-    const today = new Date();
-    const currentMonthIndex = currentDate.getMonth();
-    const currentYear = currentDate.getFullYear();
+function updateDayFooterWithDates(date) {
+  const footer = document.getElementById("dayFooter");
+  footer.innerHTML = "";
 
-    footer.innerHTML = "";
+  const startOfWeek = new Date(date);
+  startOfWeek.setDate(date.getDate() - ((date.getDay() + 6) % 7));
 
-    for (let i = -3; i <= 3; i++) {
-      const date = new Date(currentYear, currentMonthIndex + i, 1);
-      const index = date.getMonth();
-      const year = date.getFullYear();
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(startOfWeek);
+    d.setDate(d.getDate() + i);
+    const iso = d.toISOString().slice(0, 10);
 
-      const span = document.createElement("span");
-      span.textContent = months[index];
-      span.dataset.month = index;
-      span.classList.toggle("active", i === 0);
+    const dow = d.toLocaleString('default', { weekday: 'short' });
+    const day = d.getDate();
+    const isActive = d.toDateString() === date.toDateString();
+    const month = d.toLocaleString('default', { month: 'short' });
 
-      const isTodayMonth = index === today.getMonth() && year === today.getFullYear();
-      const isSelected = i === 0;
-
-      if (isTodayMonth && !isSelected) {
-        span.classList.add("current-month");
-      }
-
-      span.addEventListener("click", () => {
-        const newDate = new Date(currentYear, index, 1);
-        ec.setOption("date", newDate.toISOString().slice(0, 10));
-        ec.setOption("view", "dayGridMonth");
-        loadEvents();
-        updateTitle();
-      });
-
-      footer.appendChild(span);
-    }
+    const div = document.createElement("div");
+    div.className = "day-item" + (isActive ? " active" : "");
+    div.dataset.date = iso;
+    div.innerHTML = `
+      <div class="circle">
+          <div class="day-name">${dow}</div>
+          <div class="day-number">${day}</div>
+          ${isActive ? `<div class="day-month">${month}</div>` : ""}
+      </div>
+    `;
+    footer.appendChild(div);
   }
+}
 
-  function updateDayFooterWithDates(date) {
-    const footer = document.getElementById("dayFooter");
-    footer.innerHTML = "";
+function getWeekNumber(d) {
+  d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+}
 
-    const startOfWeek = new Date(date);
-    startOfWeek.setDate(date.getDate() - ((date.getDay() + 6) % 7));
-
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(startOfWeek);
-      d.setDate(d.getDate() + i);
-      const iso = d.toISOString().slice(0, 10);
-
-      const dow = d.toLocaleString('default', { weekday: 'short' });
-      const day = d.getDate();
-      const isActive = d.toDateString() === date.toDateString();
-      const month = d.toLocaleString('default', { month: 'short' });
-
-      const div = document.createElement("div");
-      div.className = "day-item" + (isActive ? " active" : "");
-      div.dataset.date = iso;
-      div.innerHTML = `
-        <div class="circle">
-            <div class="day-name">${dow}</div>
-            <div class="day-number">${day}</div>
-            ${isActive ? `<div class="day-month">${month}</div>` : ""}
-        </div>
-      `;
-      footer.appendChild(div);
-    }
-  }
-
-  function getWeekNumber(d) {
-    d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
-    d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
-    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-    return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
-  }
-
-  // Загружаем события сразу при загрузке страницы
-  loadEvents();
-</script>
+// Загружаем события сразу при загрузке страницы
+loadEvents();
+  </script>
 </body>
 </html>
