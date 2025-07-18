@@ -3,7 +3,6 @@ const CALENDAR_MAP = {
   "master2": "leonidzadoroznyj@gmail.com"
 };
 
-// Функция для локального форматирования даты без "Z"
 function formatDateToLocal(date, timeZone) {
   return Utilities.formatDate(date, timeZone, "yyyy-MM-dd'T'HH:mm:ss");
 }
@@ -12,18 +11,25 @@ function formatDateOnly(date, timeZone) {
   return Utilities.formatDate(date, timeZone, "yyyy-MM-dd");
 }
 
+function doGet() {
+  return ContentService
+    .createTextOutput(JSON.stringify({ status: "ok" }))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
 function doPost(e) {
   try {
     if (!e || !e.postData || !e.postData.contents) {
       throw new Error("No postData");
     }
 
-    // Простой парсер application/x-www-form-urlencoded
     const data = {};
     e.postData.contents.split("&").forEach(pair => {
       const [k, v] = pair.split("=");
       data[decodeURIComponent(k)] = decodeURIComponent(v || "");
     });
+
+    Logger.log("Received data: %s", JSON.stringify(data));
 
     if (!data.action) throw new Error("No action specified");
 
@@ -31,29 +37,29 @@ function doPost(e) {
     const calendarId = CALENDAR_MAP[calendarKey];
     if (!calendarId) throw new Error("Unknown calendar key: " + calendarKey);
 
-    const timeZone = Session.getScriptTimeZone(); // ожидается America/Toronto
+    const timeZone = Session.getScriptTimeZone(); // например America/Toronto
 
     if (data.action === "get") {
-      const calendar = CalendarApp.getCalendarById(calendarId);
-      if (!calendar) throw new Error("Calendar not found: " + calendarId);
-
       const fromDate = data.start ? new Date(data.start) : new Date('2025-01-01');
       const toDate = data.end ? new Date(data.end) : new Date('2026-01-01');
 
-      const events = calendar.getEvents(fromDate, toDate).map(ev => {
-        const allDay = ev.isAllDayEvent();
-        // Для allDay события вернуть только дату без времени, иначе дату со временем
-        const start = allDay ? formatDateOnly(ev.getStartTime(), timeZone) : formatDateToLocal(ev.getStartTime(), timeZone);
-        const end = allDay ? formatDateOnly(ev.getEndTime(), timeZone) : formatDateToLocal(ev.getEndTime(), timeZone);
-        // Добавляем resourceId по calendarKey для resource views
-        let resourceId = null;
-        if (calendarKey === "master1") resourceId = 2; // например Ирина (id=2)
-        else if (calendarKey === "master2") resourceId = 1; // например Наталья (id=1)
-        else resourceId = 0; // если нет подходящего
-
+      const events = Calendar.Events.list(calendarId, {
+        timeMin: fromDate.toISOString(),
+        timeMax: toDate.toISOString(),
+        singleEvents: true,
+        orderBy: "startTime"
+      }).items.map(ev => {
+        const allDay = !!ev.start.date;
+        const start = allDay
+          ? ev.start.date
+          : formatDateToLocal(new Date(ev.start.dateTime), timeZone);
+        const end = allDay
+          ? ev.end.date
+          : formatDateToLocal(new Date(ev.end.dateTime), timeZone);
+        let resourceId = calendarKey === "master1" ? 2 : (calendarKey === "master2" ? 1 : 0);
         return {
-          id: ev.getId(),
-          title: ev.getTitle(),
+          id: ev.id,
+          title: ev.summary || "",
           start: start,
           end: end,
           allDay: allDay,
@@ -74,7 +80,6 @@ function doPost(e) {
       const description = data.description || "";
       const location = data.location || "";
 
-      // Форматируем локальное время для API, без Z, с таймзоной
       function formatDateForApi(date) {
         return Utilities.formatDate(date, timeZone, "yyyy-MM-dd'T'HH:mm:ss");
       }
@@ -90,6 +95,7 @@ function doPost(e) {
       };
 
       const createdEvent = Calendar.Events.insert(event, calendarId);
+      Logger.log("Created event: %s", JSON.stringify(createdEvent));
 
       return ContentService
         .createTextOutput(JSON.stringify({ status: "created", id: createdEvent.id, calendar: calendarKey }))
@@ -97,38 +103,34 @@ function doPost(e) {
     }
 
     if (data.action === "update") {
-      // Используем extendedEventId если есть, иначе data.id
       const eventId = data.extendedEventId || data.id;
       if (!eventId) throw new Error("No event id for update");
 
-      const calendar = CalendarApp.getCalendarById(calendarId);
-      if (!calendar) throw new Error("Calendar not found for update");
+      const existing = Calendar.Events.get(calendarId, eventId);
+      if (!existing) throw new Error("Event not found: " + eventId);
 
-      const event = calendar.getEventById(eventId);
-      if (!event) throw new Error("Event not found: " + eventId);
+      existing.summary = data.title || existing.summary;
+      existing.description = data.description || existing.description;
+      existing.location = data.location || existing.location;
+      existing.start.dateTime = data.startTime;
+      existing.end.dateTime = data.endTime;
+      existing.start.timeZone = timeZone;
+      existing.end.timeZone = timeZone;
 
-      event.setTitle(data.title || event.getTitle());
-      event.setTime(new Date(data.startTime), new Date(data.endTime));
-      if (data.description !== undefined) event.setDescription(data.description);
-      if (data.location !== undefined) event.setLocation(data.location);
+      const updated = Calendar.Events.patch(existing, calendarId, eventId);
+      Logger.log("Updated event: %s", JSON.stringify(updated));
 
       return ContentService
-        .createTextOutput(JSON.stringify({ status: "updated", id: eventId }))
+        .createTextOutput(JSON.stringify({ status: "updated", id: updated.id }))
         .setMimeType(ContentService.MimeType.JSON);
     }
 
     if (data.action === "delete") {
-      // Используем extendedEventId если есть, иначе data.id
       const eventId = data.extendedEventId || data.id;
       if (!eventId) throw new Error("No event id for deletion");
 
-      const calendar = CalendarApp.getCalendarById(calendarId);
-      if (!calendar) throw new Error("Calendar not found for deletion");
-
-      const event = calendar.getEventById(eventId);
-      if (!event) throw new Error("Event not found for deletion: " + eventId);
-
-      event.deleteEvent();
+      Calendar.Events.remove(calendarId, eventId);
+      Logger.log("Deleted event ID: %s", eventId);
 
       return ContentService
         .createTextOutput(JSON.stringify({ status: "deleted", id: eventId }))
@@ -138,6 +140,7 @@ function doPost(e) {
     throw new Error("Unknown action: " + data.action);
 
   } catch (err) {
+    Logger.log("Error: %s", err.toString());
     return ContentService
       .createTextOutput(JSON.stringify({ status: "error", message: err.message || err.toString() }))
       .setMimeType(ContentService.MimeType.JSON);
