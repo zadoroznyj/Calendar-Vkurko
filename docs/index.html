@@ -1,3 +1,13 @@
+headers: {
+  "Content-Type": "application/json"
+},
+body: JSON.stringify({
+  action: 'get',
+  start: range.start.toISOString(),
+  end: range.end.toISOString(),
+  calendar: cal.calendar
+})
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
