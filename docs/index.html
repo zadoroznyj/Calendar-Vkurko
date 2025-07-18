@@ -172,9 +172,13 @@
     }
   });
 
+  // Метка для хранения сроков жизни кэша
   const CACHE_META_KEY = 'events-cache-meta';
+
+  // Храним текущие события в памяти для локального обновления
   let currentEvents = [];
 
+  // Получить кэш-мета объект из localStorage
   function getCacheMeta() {
     try {
       return JSON.parse(localStorage.getItem(CACHE_META_KEY)) || {};
@@ -183,10 +187,12 @@
     }
   }
 
+  // Сохранить кэш-мета объект в localStorage
   function setCacheMeta(meta) {
     localStorage.setItem(CACHE_META_KEY, JSON.stringify(meta));
   }
 
+  // Удалить кэш для указанного ключа
   function clearCacheForKey(key) {
     localStorage.removeItem(key);
     const meta = getCacheMeta();
@@ -196,6 +202,7 @@
     }
   }
 
+  // Очистить ВСЕ кэши событий (только события, не весь localStorage)
   function clearAllEventsCache() {
     const meta = getCacheMeta();
     for (const key in meta) {
@@ -232,7 +239,7 @@
     }
     return { start, end };
   }
-
+    // loadEvents принимает флаг silent - если true, обновляем currentEvents, но не меняем UI
   async function loadEvents(silent = false) {
     try {
       const range = getVisibleRange();
@@ -248,12 +255,13 @@
         }
         return;
       } else {
+        // Если устарел кэш — удаляем старые данные
         clearCacheForKey(rangeKey);
       }
 
       const calendars = [
-        { calendar: 'master1', resourceId: 1 },
-        { calendar: 'master2', resourceId: 2 }
+        { calendar: 'master1', resourceId: 2 },
+        { calendar: 'master2', resourceId: 1 }
       ];
       const allEvents = [];
 
@@ -291,6 +299,7 @@
         updateTitle();
       }
 
+      // Сохраняем в кэш и обновляем meta с TTL 10 минут
       localStorage.setItem(rangeKey, JSON.stringify(currentEvents));
       meta[rangeKey] = { expiresAt: now + 10 * 60 * 1000 };
       setCacheMeta(meta);
@@ -356,6 +365,7 @@
     }
   });
 
+  // Обновить событие локально в currentEvents и в UI, без сброса всего кеша и полной перезагрузки
   function updateEventLocally(updatedEvent) {
     const index = currentEvents.findIndex(e => e.id === updatedEvent.id);
     if (index !== -1) {
@@ -366,6 +376,7 @@
     ec.setOption('events', currentEvents);
   }
 
+  // Удалить событие локально из currentEvents и обновить UI
   function deleteEventLocally(eventId) {
     currentEvents = currentEvents.filter(e => e.id !== eventId);
     ec.setOption('events', currentEvents);
@@ -390,13 +401,14 @@
     .then(res => res.json())
     .then(data => {
       if (data.status === "created" && data.event) {
+        // 1. Вставляем calendar и resourceId в новое событие, чтобы ID был полным
         const newEv = {
           id: data.event.id,
           title: data.event.title,
           start: data.event.start,
           end: data.event.end,
-          resourceId: data.event.resourceId || 1,
-          calendar: data.event.calendar || '',
+          resourceId: data.event.resourceId || 1, // если нет, дефолт
+          calendar: data.event.calendar || 'master1', // если нет, дефолт
           color: (data.event.calendar === 'master1') ? '#007bff' : '#28a745'
         };
         updateEventLocally(newEv);
@@ -410,7 +422,6 @@
       alert("Ошибка отправки create: " + err.message);
     });
   }
-
   function editEventPrompt(event) {
     const newTitle = prompt("Редактировать название события:", event.title);
     if (newTitle === null) return;
@@ -434,163 +445,156 @@
         })
         .catch(err => {
           console.error("Ошибка удаления:", err);
-          alert("Ошибка удаления: " + err.message);
-        });
-      }
-      return;
-    }
+alert("Ошибка удаления: " + err.message);
+});
+}
 
-    const params = new URLSearchParams({
-      action: "update",
+const params = new URLSearchParams({
+  action: "update",
+  id: event.id,
+  title: newTitle,
+  startTime: event.start.toISOString().replace("Z", ""),
+  endTime: event.end ? event.end.toISOString().replace("Z", "") : ""
+});
+
+fetch(GAS_URL, {
+  method: "POST",
+  headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
+  body: params.toString()
+})
+.then(res => res.json())
+.then(data => {
+  if (data.status === "updated") {
+    const updatedEv = {
       id: event.id,
       title: newTitle,
-      startTime: event.start.toISOString().replace("Z",""),
-      endTime: event.end ? event.end.toISOString().replace("Z","") : ""
-    });
+      start: event.start.toISOString(),
+      end: event.end ? event.end.toISOString() : null,
+      resourceId: event.resourceId || 1,
+      calendar: event.calendar || (event.extendedProps && event.extendedProps.calendar) || '',
+      color: (event.calendar === 'master1' || (event.extendedProps && event.extendedProps.calendar === 'master1')) ? '#007bff' : '#28a745'
+    };
+    updateEventLocally(updatedEv);
+    loadEvents(true);
+  } else {
+    alert("Ошибка обновления события: " + (data.message || "неизвестная ошибка"));
+  }
+})
+.catch(err => {
+  console.error("Ошибка отправки update:", err);
+  alert("Ошибка отправки update: " + err.message);
+});
+}
 
-    fetch(GAS_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
-      body: params.toString()
-    })
-    .then(res => res.json())
-    .then(data => {
-      if (data.status === "updated") {
-        const calendar = event.extendedProps?.calendar || event.calendar || '';
-        const resourceId = calendar === 'master1' ? 1 : 2;
+function updateActiveMode(viewName) {
+  document.querySelectorAll("#modeSwitcher span").forEach(el => {
+    el.classList.toggle("active", el.dataset.view === viewName);
+  });
+  document.getElementById("dayFooter").style.display = viewName === "resourceTimeGridDay" ? "flex" : "none";
+  document.getElementById("monthFooter").style.display = viewName === "resourceTimeGridDay" ? "none" : "flex";
+}
 
-        const updatedEv = {
-          id: event.id,
-          title: newTitle,
-          start: event.start.toISOString(),
-          end: event.end ? event.end.toISOString() : null,
-          resourceId: resourceId,
-          calendar: calendar,
-          color: calendar === 'master1' ? '#007bff' : '#28a745'
-        };
-        updateEventLocally(updatedEv);
-        loadEvents(true);
-      } else {
-        alert("Ошибка обновления события: " + (data.message || "неизвестная ошибка"));
-      }
-    })
-    .catch(err => {
-      console.error("Ошибка отправки update:", err);
-      alert("Ошибка отправки update: " + err.message);
-    });
+function updateTitle() {
+  const dateStr = ec.getOption("date");
+  const date = new Date(dateStr);
+  const view = ec.getOption("view");
+
+  const day = date.getDate();
+  const dow = date.toLocaleString('default', { weekday: 'long' });
+  const monthShort = date.toLocaleString('default', { month: 'short' });
+
+  if (view === "resourceTimeGridDay") {
+    document.getElementById("calendarTitle").textContent = `${dow}, ${day} ${monthShort}`;
+    document.getElementById("calendarSubtitle").textContent = `Week ${getWeekNumber(date)}`;
+    updateDayFooterWithDates(date);
+  } else {
+    const month = date.toLocaleString('default', { month: 'long' });
+    const year = date.getFullYear();
+    document.getElementById("calendarTitle").textContent = `${month} ${year}`;
+    document.getElementById("calendarSubtitle").textContent = ``;
   }
 
-  function updateActiveMode(viewName) {
-    document.querySelectorAll("#modeSwitcher span").forEach(el => {
-      el.classList.toggle("active", el.dataset.view === viewName);
-    });
-    document.getElementById("dayFooter").style.display = viewName === "resourceTimeGridDay" ? "flex" : "none";
-    document.getElementById("monthFooter").style.display = viewName === "resourceTimeGridDay" ? "none" : "flex";
-  }
+  updateMonthFooter(date);
+}
 
-  function updateTitle() {
-    const dateStr = ec.getOption("date");
-    const date = new Date(dateStr);
-    const view = ec.getOption("view");
+function updateMonthFooter(currentDate) {
+  const footer = document.getElementById("monthFooter");
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const today = new Date();
+  const currentMonthIndex = currentDate.getMonth();
+  const currentYear = currentDate.getFullYear();
 
-    const day = date.getDate();
-    const dow = date.toLocaleString('default', { weekday: 'long' });
-    const monthShort = date.toLocaleString('default', { month: 'short' });
+  footer.innerHTML = "";
 
-    if (view === "resourceTimeGridDay") {
-      document.getElementById("calendarTitle").textContent = `${dow}, ${day} ${monthShort}`;
-      document.getElementById("calendarSubtitle").textContent = `Week ${getWeekNumber(date)}`;
-      updateDayFooterWithDates(date);
-    } else {
-      const month = date.toLocaleString('default', { month: 'long' });
-      const year = date.getFullYear();
-      document.getElementById("calendarTitle").textContent = `${month} ${year}`;
-      document.getElementById("calendarSubtitle").textContent = ``;
+  for (let i = -3; i <= 3; i++) {
+    const date = new Date(currentYear, currentMonthIndex + i, 1);
+    const index = date.getMonth();
+    const year = date.getFullYear();
+
+    const span = document.createElement("span");
+    span.textContent = months[index];
+    span.dataset.month = index;
+    span.classList.toggle("active", i === 0);
+
+    const isTodayMonth = index === today.getMonth() && year === today.getFullYear();
+    const isSelected = i === 0;
+
+    if (isTodayMonth && !isSelected) {
+      span.classList.add("current-month");
     }
 
-    updateMonthFooter(date);
+    span.addEventListener("click", () => {
+      const newDate = new Date(currentYear, index, 1);
+      ec.setOption("date", newDate.toISOString().slice(0, 10));
+      ec.setOption("view", "dayGridMonth");
+      loadEvents();
+      updateTitle();
+    });
+
+    footer.appendChild(span);
   }
+}
 
-  function updateMonthFooter(currentDate) {
-    const footer = document.getElementById("monthFooter");
-      function updateMonthFooter(currentDate) {
-    const footer = document.getElementById("monthFooter");
-    const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-    const today = new Date();
-    const currentMonthIndex = currentDate.getMonth();
-    const currentYear = currentDate.getFullYear();
+function updateDayFooterWithDates(date) {
+  const footer = document.getElementById("dayFooter");
+  footer.innerHTML = "";
 
-    footer.innerHTML = "";
+  const startOfWeek = new Date(date);
+  startOfWeek.setDate(date.getDate() - ((date.getDay() + 6) % 7));
 
-    for (let i = -3; i <= 3; i++) {
-      const date = new Date(currentYear, currentMonthIndex + i, 1);
-      const index = date.getMonth();
-      const year = date.getFullYear();
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(startOfWeek);
+    d.setDate(d.getDate() + i);
+    const iso = d.toISOString().slice(0, 10);
 
-      const span = document.createElement("span");
-      span.textContent = months[index];
-      span.dataset.month = index;
-      span.classList.toggle("active", i === 0);
+    const dow = d.toLocaleString('default', { weekday: 'short' });
+    const day = d.getDate();
+    const isActive = d.toDateString() === date.toDateString();
+    const month = d.toLocaleString('default', { month: 'short' });
 
-      const isTodayMonth = index === today.getMonth() && year === today.getFullYear();
-      const isSelected = i === 0;
-
-      if (isTodayMonth && !isSelected) {
-        span.classList.add("current-month");
-      }
-
-      span.addEventListener("click", () => {
-        const newDate = new Date(currentYear, index, 1);
-        ec.setOption("date", newDate.toISOString().slice(0, 10));
-        ec.setOption("view", "dayGridMonth");
-        loadEvents();
-        updateTitle();
-      });
-
-      footer.appendChild(span);
-    }
+    const div = document.createElement("div");
+    div.className = "day-item" + (isActive ? " active" : "");
+    div.dataset.date = iso;
+    div.innerHTML = `
+      <div class="circle">
+          <div class="day-name">${dow}</div>
+          <div class="day-number">${day}</div>
+          ${isActive ? `<div class="day-month">${month}</div>` : ""}
+      </div>
+    `;
+    footer.appendChild(div);
   }
+}
 
-  function updateDayFooterWithDates(date) {
-    const footer = document.getElementById("dayFooter");
-    footer.innerHTML = "";
+function getWeekNumber(d) {
+  d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+}
 
-    const startOfWeek = new Date(date);
-    startOfWeek.setDate(date.getDate() - ((date.getDay() + 6) % 7));
-
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(startOfWeek);
-      d.setDate(d.getDate() + i);
-      const iso = d.toISOString().slice(0, 10);
-
-      const dow = d.toLocaleString('default', { weekday: 'short' });
-      const day = d.getDate();
-      const isActive = d.toDateString() === date.toDateString();
-      const month = d.toLocaleString('default', { month: 'short' });
-
-      const div = document.createElement("div");
-      div.className = "day-item" + (isActive ? " active" : "");
-      div.dataset.date = iso;
-      div.innerHTML = `
-        <div class="circle">
-            <div class="day-name">${dow}</div>
-            <div class="day-number">${day}</div>
-            ${isActive ? `<div class="day-month">${month}</div>` : ""}
-        </div>
-      `;
-      footer.appendChild(div);
-    }
-  }
-
-  function getWeekNumber(d) {
-    d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
-    d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
-    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-    return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
-  }
-
-  // Загружаем события сразу при загрузке страницы
-  loadEvents();
+// Загружаем события сразу при загрузке страницы
+loadEvents();
 </script>
 </body>
 </html>
