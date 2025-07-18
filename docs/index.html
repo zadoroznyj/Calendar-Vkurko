@@ -1,3 +1,40 @@
+function doPost(e) {
+  const data = JSON.parse(e.postData.contents);
+  const action = data.action;
+  ...
+}
+
+
+
+
+
+
+fetch(GAS_URL, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify(Object.fromEntries(params))
+})
+
+
+
+
+
+
+
+fetch(GAS_URL, {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json"
+  },
+  body: JSON.stringify(Object.fromEntries(params))
+})
+
+
+
+
+
+
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
