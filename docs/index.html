@@ -189,6 +189,16 @@
       const res = await fetch(`${API_BASE}/events?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`, {
         credentials: 'include',
       });
+
+      if (res.status === 401) {                                  // <<=== Добавлено: если 401 — редирект на authUrl
+        const data = await res.json();
+        if (data.authUrl) {
+          window.location.href = data.authUrl;
+          return;
+        }
+        throw new Error("Неавторизовано");
+      }
+
       if (!res.ok) throw new Error(`Ошибка загрузки: ${res.status}`);
       const events = await res.json();
 
@@ -301,7 +311,7 @@
         color: '#007bff',
         calendar: 'primary',
       };
-      updateEventLocally(newEv);
+            updateEventLocally(newEv);
       loadEvents();
     } catch (e) {
       console.error(e);
@@ -510,6 +520,20 @@
     const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
     return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
   }
+
+  // ====== Дополнение: очистка параметра code из URL после возврата OAuth ====== // <<=== Добавлено
+  (function cleanupOAuthCodeParam() {
+    try {
+      const url = new URL(window.location.href);
+      if (url.searchParams.has('code')) {
+        url.searchParams.delete('code');
+        url.searchParams.delete('state'); // если есть state — тоже удалить
+        window.history.replaceState({}, document.title, url.pathname + url.search + url.hash);
+      }
+    } catch(e) {
+      console.warn('Ошибка очистки параметров URL:', e);
+    }
+  })();
 
   // Запуск загрузки событий при загрузке страницы
   loadEvents();
