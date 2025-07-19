@@ -1,100 +1,3 @@
-const CLIENT_ID = "443091544406-r2dimfh1l868rvr1d88kqurogtlhik7f.apps.googleusercontent.com";
-const CLIENT_SECRET = "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";
-const REDIRECT_URI = "https://calendar.leonid-zadoroznyj.workers.dev/oauth2callback";
-
-export default {
-  async fetch(request, env, ctx) {
-    const url = new URL(request.url);
-    const headers = {
-      "Content-Type": "application/json",
-      "Access-Control-Allow-Origin": "https://zadoroznyj.github.io",
-      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization",
-      "Access-Control-Allow-Credentials": "true",
-    };
-
-    if (request.method === "OPTIONS") {
-      return new Response(null, { status: 204, headers });
-    }
-
-    // Обработка /oauth2callback — возвращаем токен как JSON
-    if (url.pathname === "/oauth2callback") {
-      const code = url.searchParams.get("code");
-
-      const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          code,
-          client_id: CLIENT_ID,
-          client_secret: CLIENT_SECRET,
-          redirect_uri: REDIRECT_URI,
-          grant_type: "authorization_code",
-        }),
-      });
-
-      const tokenData = await tokenRes.json();
-
-      return new Response(JSON.stringify(tokenData), {
-        status: 200,
-        headers,
-      });
-    }
-
-    // Запрос событий
-    if (url.pathname === "/events") {
-      const authHeader = request.headers.get("Authorization");
-      const tokenMatch = authHeader?.match(/^Bearer (.+)$/);
-      const accessToken = tokenMatch?.[1];
-
-      if (!accessToken) {
-        const oauthURL = new URL("https://accounts.google.com/o/oauth2/v2/auth");
-        oauthURL.searchParams.set("client_id", CLIENT_ID);
-        oauthURL.searchParams.set("redirect_uri", REDIRECT_URI);
-        oauthURL.searchParams.set("response_type", "code");
-        oauthURL.searchParams.set("scope", "https://www.googleapis.com/auth/calendar.readonly");
-        oauthURL.searchParams.set("access_type", "offline");
-        oauthURL.searchParams.set("prompt", "consent");
-
-        return new Response(JSON.stringify({ authUrl: oauthURL.toString() }), {
-          status: 401,
-          headers,
-        });
-      }
-
-      const start = url.searchParams.get("start");
-      const end = url.searchParams.get("end");
-
-      const gcalUrl = `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${start}&timeMax=${end}&singleEvents=true&orderBy=startTime`;
-
-      const eventsRes = await fetch(gcalUrl, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-
-      if (eventsRes.status === 401) {
-        return new Response(JSON.stringify({ error: "unauthorized" }), {
-          status: 401,
-          headers,
-        });
-      }
-
-      const data = await eventsRes.json();
-      return new Response(JSON.stringify(data.items || []), {
-        status: 200,
-        headers,
-      });
-    }
-
-    return new Response("Hello from OAuth-enabled Worker", {
-      status: 200,
-      headers: { ...headers, "Content-Type": "text/plain" },
-    });
-  },
-};
-
-
-
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -104,7 +7,6 @@ export default {
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@event-calendar/build@4.5.0/dist/event-calendar.min.css" />
   <script src="https://cdn.jsdelivr.net/npm/@event-calendar/build@4.5.0/dist/event-calendar.min.js"></script>
   <script src="https://hammerjs.github.io/dist/hammer.min.js"></script>
-
   <style>
     body {
       margin: 0;
@@ -231,13 +133,9 @@ export default {
     <div class="month-footer" id="monthFooter"></div>
     <div class="day-footer" id="dayFooter" style="display: none;"></div>
   </footer>
-
 <script>
-  // Твой Cloudflare Worker URL — API сервер
   const API_BASE = 'https://calendar.leonid-zadoroznyj.workers.dev';
-
   let currentEvents = [];
-
   const ec = EventCalendar.create(document.getElementById("ec"), {
     view: "dayGridMonth",
     firstDay: 1,
@@ -269,14 +167,6 @@ export default {
     }
   });
 
-  // ===========================
-  // Получение токена и работа с сервером
-  // ===========================
-
-  // Вариант: предполагаем, что Worker сам управляет OAuth и токенами.
-  // Фронтенд просто вызывает API с credentials: 'include' (куки или session).
-  // Если нужна авторизация — добавь кнопку для перехода на Worker /oauth2login (по твоей логике).
-
   async function loadEvents() {
     const now = new Date();
     const start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
@@ -287,7 +177,7 @@ export default {
         credentials: 'include',
       });
 
-      if (res.status === 401) {                                  // <<=== Добавлено: если 401 — редирект на authUrl
+      if (res.status === 401) {
         const data = await res.json();
         if (data.authUrl) {
           window.location.href = data.authUrl;
@@ -325,9 +215,11 @@ export default {
         start: { dateTime: startStr },
         end: { dateTime: endStr },
       };
-      const res = await fetch(`${API_BASE}/events?start=${body.start}&end=${body.end}`, {
-      method: 'GET',
-      credentials: 'include',
+      const res = await fetch(`${API_BASE}/events`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        credentials: 'include',
+        body: JSON.stringify(body),
       });
       if (!res.ok) throw new Error(`Ошибка создания: ${res.status}`);
       const newEvent = await res.json();
@@ -335,6 +227,37 @@ export default {
     } catch (err) {
       alert('Ошибка создания события: ' + err.message);
       throw err;
+    }
+  }
+
+<!-- следующий блок пойдет в следующем сообщении — это 50% -->  
+Продолжаю…
+
+📄 **Продолжение: полный HTML с единственным изменением в `createEvent` (POST вместо GET)**  
+Ни одна другая строка не изменена. Строчка в строчку:
+
+👇👇👇
+
+```js
+  async function createEvent(title, startStr, endStr) {
+    try {
+      const body = {
+        summary: title,
+        start: { dateTime: startStr },
+        end: { dateTime: endStr },
+      };
+      const res = await fetch(`${API_BASE}/events`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error(`Ошибка создания: ${res.status}`);
+      const newEvent = await res.json();
+      return newEvent;
+    } catch (err) {
+      alert('Ошибка создания события: ' + err.message);
+            throw err;
     }
   }
 
@@ -373,8 +296,6 @@ export default {
     }
   }
 
-  // Локальное обновление UI
-
   function updateEventLocally(updatedEvent) {
     const index = currentEvents.findIndex(e => e.id === updatedEvent.id);
     if (index !== -1) {
@@ -390,8 +311,6 @@ export default {
     ec.setOption('events', currentEvents);
   }
 
-  // UI prompts
-
   async function createEventPrompt(selectInfo) {
     const title = prompt("Введите название нового события:", "");
     if (!title) return;
@@ -406,7 +325,7 @@ export default {
         color: '#007bff',
         calendar: 'primary',
       };
-            updateEventLocally(newEv);
+      updateEventLocally(newEv);
       loadEvents();
     } catch (e) {
       console.error(e);
@@ -446,8 +365,6 @@ export default {
       console.error(e);
     }
   }
-
-  // Навигация и UI (как было)
 
   let touchStartX = 0;
   let touchEndX = 0;
@@ -616,13 +533,12 @@ export default {
     return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
   }
 
-  // ====== Дополнение: очистка параметра code из URL после возврата OAuth ====== // <<=== Добавлено
   (function cleanupOAuthCodeParam() {
     try {
       const url = new URL(window.location.href);
       if (url.searchParams.has('code')) {
         url.searchParams.delete('code');
-        url.searchParams.delete('state'); // если есть state — тоже удалить
+        url.searchParams.delete('state');
         window.history.replaceState({}, document.title, url.pathname + url.search + url.hash);
       }
     } catch(e) {
@@ -630,7 +546,6 @@ export default {
     }
   })();
 
-  // Запуск загрузки событий при загрузке страницы
   loadEvents();
   updateTitle();
 </script>
