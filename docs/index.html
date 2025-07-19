@@ -1,11 +1,3 @@
-Client ID
-443091544406-r2dimfh1l868rvr1d88kqurogtlhik7f.apps.googleusercontent.com
-Client secret
-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
-
-
-
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -15,6 +7,10 @@ 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
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@event-calendar/build@4.5.0/dist/event-calendar.min.css" />
   <script src="https://cdn.jsdelivr.net/npm/@event-calendar/build@4.5.0/dist/event-calendar.min.js"></script>
   <script src="https://hammerjs.github.io/dist/hammer.min.js"></script>
+
+  <!-- Добавляем Google API client -->
+  <script src="https://apis.google.com/js/api.js"></script>
+
   <style>
     body {
       margin: 0;
@@ -142,12 +138,10 @@ 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
     <div class="day-footer" id="dayFooter" style="display: none;"></div>
   </footer>
 <script>
-  let touchStartX = 0;
-  let touchEndX = 0;
-  let lastClickedDate = null;
-  let lastTapTime = 0;
+  const CLIENT_ID = '443091544406-r2dimfh1l868rvr1d88kqurogtlhik7f.apps.googleusercontent.com';
+  const SCOPES = 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly';
 
-  const GAS_URL = 'https://script.google.com/macros/s/AKfycbxkPTGe1efqRCbQ-Vgw62pPA0O2kG7V9Vrq6ZGWDfeoOt4K_so1C_ecxFzceyMDO0I/exec';
+  let currentEvents = [];
 
   const ec = EventCalendar.create(document.getElementById("ec"), {
     view: "dayGridMonth",
@@ -180,147 +174,210 @@ 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
     }
   });
 
-  // Метка для хранения сроков жизни кэша
-  const CACHE_META_KEY = 'events-cache-meta';
+  // ============ Google API init ============
 
-  // Храним текущие события в памяти для локального обновления
-  let currentEvents = [];
+  function initClient() {
+    return gapi.client.init({
+      clientId: CLIENT_ID,
+      scope: SCOPES,
+      discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest"]
+    });
+  }
 
-  // Получить кэш-мета объект из localStorage
-  function getCacheMeta() {
-    try {
-      return JSON.parse(localStorage.getItem(CACHE_META_KEY)) || {};
-    } catch {
-      return {};
+  async function signIn() {
+    const authInstance = gapi.auth2.getAuthInstance();
+    if (!authInstance.isSignedIn.get()) {
+      await authInstance.signIn();
     }
   }
 
-  // Сохранить кэш-мета объект в localStorage
-  function setCacheMeta(meta) {
-    localStorage.setItem(CACHE_META_KEY, JSON.stringify(meta));
-  }
-
-  // Удалить кэш для указанного ключа
-  function clearCacheForKey(key) {
-    localStorage.removeItem(key);
-    const meta = getCacheMeta();
-    if (meta[key]) {
-      delete meta[key];
-      setCacheMeta(meta);
+  async function signOut() {
+    const authInstance = gapi.auth2.getAuthInstance();
+    if (authInstance.isSignedIn.get()) {
+      await authInstance.signOut();
     }
   }
 
-  // Очистить ВСЕ кэши событий (только события, не весь localStorage)
-  function clearAllEventsCache() {
-    const meta = getCacheMeta();
-    for (const key in meta) {
-      if (key.startsWith('events-')) {
-        localStorage.removeItem(key);
-        delete meta[key];
-      }
-    }
-    setCacheMeta(meta);
-  }
-
-  function getVisibleRange() {
-    const view = ec.getOption('view');
-    const currentDateStr = ec.getOption('date');
-    const currentDate = new Date(currentDateStr);
-    let start, end;
-
-    if (view === 'dayGridMonth') {
-      start = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-      end = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0, 23, 59, 59);
-    } else if (view === 'resourceTimeGridDay' || view === 'listWeek') {
-      start = new Date(currentDate); start.setHours(0, 0, 0, 0);
-      end = new Date(currentDate); end.setHours(23, 59, 59, 999);
-    } else if (view === 'resourceTimeGridWeek' || view === 'resourceTimelineWeek') {
-      const day = currentDate.getDay();
-      const diffToMonday = (day + 6) % 7;
-      start = new Date(currentDate); start.setDate(currentDate.getDate() - diffToMonday);
-      start.setHours(0, 0, 0, 0);
-      end = new Date(start); end.setDate(start.getDate() + 6);
-      end.setHours(23, 59, 59, 999);
-    } else {
-      start = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-      end = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0, 23, 59, 59);
-    }
-    return { start, end };
-  }
-    // loadEvents принимает флаг silent - если true, обновляем currentEvents, но не меняем UI
-  async function loadEvents(silent = false) {
-    try {
-      const range = getVisibleRange();
-      const rangeKey = `events-${range.start.toISOString()}-${range.end.toISOString()}`;
-      const meta = getCacheMeta();
-      const now = Date.now();
-
-      if (localStorage.getItem(rangeKey) && meta[rangeKey] && now < meta[rangeKey].expiresAt) {
-        currentEvents = JSON.parse(localStorage.getItem(rangeKey));
-        if (!silent) {
-          ec.setOption('events', currentEvents);
-          updateTitle();
-        }
-        return;
-      } else {
-        // Если устарел кэш — удаляем старые данные
-        clearCacheForKey(rangeKey);
-      }
-
-      const calendars = [
-        { calendar: 'master1', resourceId: 2 },
-        { calendar: 'master2', resourceId: 1 }
-      ];
-      const allEvents = [];
-
-      for (const cal of calendars) {
-        const params = new URLSearchParams({
-          action: 'get',
-          start: range.start.toISOString(),
-          end: range.end.toISOString(),
-          calendar: cal.calendar
+  function start() {
+    gapi.load('client:auth2', () => {
+      initClient().then(() => {
+        signIn().then(() => {
+          loadEvents();
         });
+      });
+    });
+  }
 
-        const response = await fetch(GAS_URL, {
-          method: 'POST',
-          headers: {
-  "Content-Type": "application/json"
-},
-body: JSON.stringify({
-  action: 'get',
-  start: range.start.toISOString(),
-  end: range.end.toISOString(),
-  calendar: cal.calendar
-});
+  // ============ Load events from Google Calendar API ============
 
-        if (!response.ok) throw new Error('Network error');
-        const events = await response.json();
+  async function loadEvents() {
+    const calendarId = 'primary';
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString();
 
-        for (const ev of events) {
-          ev.resourceId = cal.resourceId;
-          ev.calendar = cal.calendar;
-          ev.color = cal.calendar === 'master1' ? '#007bff' : '#28a745';
-          allEvents.push(ev);
-        }
-      }
+    try {
+      const response = await gapi.client.calendar.events.list({
+        calendarId,
+        timeMin: start,
+        timeMax: end,
+        showDeleted: false,
+        singleEvents: true,
+        orderBy: 'startTime',
+      });
 
-      currentEvents = allEvents;
+      const events = response.result.items || [];
 
-      if (!silent) {
-        ec.setOption('events', currentEvents);
-        updateTitle();
-      }
+      currentEvents = events.map(ev => ({
+        id: ev.id,
+        title: ev.summary || '(без названия)',
+        start: ev.start.dateTime || ev.start.date,
+        end: ev.end.dateTime || ev.end.date,
+        allDay: !!ev.start.date,
+        resourceId: ev.attendees ? 1 : 2, // просто пример, можно по-другому
+        calendar: 'primary',
+        color: '#007bff',
+      }));
 
-      // Сохраняем в кэш и обновляем meta с TTL 10 минут
-      localStorage.setItem(rangeKey, JSON.stringify(currentEvents));
-      meta[rangeKey] = { expiresAt: now + 10 * 60 * 1000 };
-      setCacheMeta(meta);
-
-    } catch (error) {
-      console.error('Ошибка загрузки событий:', error);
-      alert('Ошибка загрузки событий: ' + error.message);
+      ec.setOption('events', currentEvents);
+      updateTitle();
+    } catch (err) {
+      alert('Ошибка загрузки событий: ' + err.message);
+      console.error(err);
     }
   }
+
+  // ============ Event create / update / delete через Google API ============
+
+  async function createEvent(title, startStr, endStr) {
+    try {
+      const event = {
+        summary: title,
+        start: { dateTime: startStr },
+        end: { dateTime: endStr },
+      };
+      const response = await gapi.client.calendar.events.insert({
+        calendarId: 'primary',
+        resource: event,
+      });
+      return response.result;
+    } catch (err) {
+      alert('Ошибка создания события: ' + err.message);
+      throw err;
+    }
+  }
+
+  async function updateEvent(id, title, startStr, endStr) {
+    try {
+      const event = {
+        summary: title,
+        start: { dateTime: startStr },
+        end: { dateTime: endStr },
+      };
+      const response = await gapi.client.calendar.events.update({
+        calendarId: 'primary',
+        eventId: id,
+        resource: event,
+      });
+      return response.result;
+    } catch (err) {
+      alert('Ошибка обновления события: ' + err.message);
+      throw err;
+    }
+  }
+
+  async function deleteEvent(id) {
+    try {
+      await gapi.client.calendar.events.delete({
+        calendarId: 'primary',
+        eventId: id,
+      });
+    } catch (err) {
+      alert('Ошибка удаления события: ' + err.message);
+      throw err;
+    }
+  }
+
+  // ============ Локальные обновления в UI ============
+
+  function updateEventLocally(updatedEvent) {
+    const index = currentEvents.findIndex(e => e.id === updatedEvent.id);
+    if (index !== -1) {
+      currentEvents[index] = updatedEvent;
+    } else {
+      currentEvents.push(updatedEvent);
+    }
+    ec.setOption('events', currentEvents);
+  }
+
+  function deleteEventLocally(eventId) {
+    currentEvents = currentEvents.filter(e => e.id !== eventId);
+    ec.setOption('events', currentEvents);
+  }
+
+  // ============ UI prompts для create / edit ============
+
+  async function createEventPrompt(selectInfo) {
+    const title = prompt("Введите название нового события:", "");
+    if (!title) return;
+
+    try {
+      const newEvent = await createEvent(title, selectInfo.startStr, selectInfo.endStr);
+      const newEv = {
+        id: newEvent.id,
+        title: newEvent.summary,
+        start: newEvent.start.dateTime || newEvent.start.date,
+        end: newEvent.end.dateTime || newEvent.end.date,
+        color: '#007bff',
+        calendar: 'primary',
+      };
+      updateEventLocally(newEv);
+      loadEvents();
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  async function editEventPrompt(event) {
+    const newTitle = prompt("Редактировать название события:", event.title);
+    if (newTitle === null) return;
+
+    if (newTitle === "") {
+      if (confirm("Удалить событие?")) {
+        try {
+          await deleteEvent(event.id);
+          deleteEventLocally(event.id);
+          loadEvents();
+        } catch (e) {
+          console.error(e);
+        }
+      }
+      return;
+    }
+
+    try {
+      const updated = await updateEvent(event.id, newTitle, event.start.toISOString(), event.end ? event.end.toISOString() : event.start.toISOString());
+      const updatedEv = {
+        id: updated.id,
+        title: updated.summary,
+        start: updated.start.dateTime || updated.start.date,
+        end: updated.end.dateTime || updated.end.date,
+        color: '#007bff',
+        calendar: 'primary',
+      };
+      updateEventLocally(updatedEv);
+      loadEvents();
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  // ============ Навигация и UI ============
+
+  let touchStartX = 0;
+  let touchEndX = 0;
+  let lastClickedDate = null;
+  let lastTapTime = 0;
 
   ec.setOption("dateClick", function(info) {
     lastClickedDate = info.dateStr;
@@ -376,130 +433,6 @@ body: JSON.stringify({
       updateTitle();
     }
   });
-
-  // Обновить событие локально в currentEvents и в UI, без сброса всего кеша и полной перезагрузки
-  function updateEventLocally(updatedEvent) {
-    const index = currentEvents.findIndex(e => e.id === updatedEvent.id);
-    if (index !== -1) {
-      currentEvents[index] = updatedEvent;
-    } else {
-      currentEvents.push(updatedEvent);
-    }
-    ec.setOption('events', currentEvents);
-  }
-
-  // Удалить событие локально из currentEvents и обновить UI
-  function deleteEventLocally(eventId) {
-    currentEvents = currentEvents.filter(e => e.id !== eventId);
-    ec.setOption('events', currentEvents);
-  }
-
-  function createEventPrompt(selectInfo) {
-    const title = prompt("Введите название нового события:", "");
-    if (!title) return;
-
-    const params = new URLSearchParams({
-      action: "create",
-      title: title,
-      startTime: selectInfo.startStr,
-      endTime: selectInfo.endStr
-    });
-
-    fetch(GAS_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-  body: JSON.stringify(Object.fromEntries(params))
-    })
-    .then(res => res.json())
-    .then(data => {
-      if (data.status === "created" && data.event) {
-        // Обновляем локально и в UI
-        const newEv = {
-          id: data.event.id,
-          title: data.event.title,
-          start: data.event.start,
-          end: data.event.end,
-          resourceId: data.event.resourceId,
-          calendar: data.event.calendar,
-          color: data.event.calendar === 'master1' ? '#007bff' : '#28a745'
-        };
-        updateEventLocally(newEv);
-        // Загружаем обновления в фоне, не трогая UI
-        loadEvents(true);
-      } else {
-        alert("Ошибка создания события: " + (data.message || "неизвестная ошибка"));
-      }
-    })
-    .catch(err => {
-      console.error("Ошибка отправки create:", err);
-      alert("Ошибка отправки create: " + err.message);
-    });
-  }
-    function editEventPrompt(event) {
-    const newTitle = prompt("Редактировать название события:", event.title);
-    if (newTitle === null) return;
-
-    if (newTitle === "") {
-      if (confirm("Удалить событие?")) {
-        const params = new URLSearchParams({ action: "delete", id: event.id });
-        fetch(GAS_URL, {
-          method: "POST",
-         headers: { "Content-Type": "application/json" },
-  body: JSON.stringify(Object.fromEntries(params))
-        })
-        .then(res => res.json())
-        .then(data => {
-          if (data.status === "deleted") {
-            deleteEventLocally(event.id);
-            loadEvents(true);
-          } else {
-            alert("Ошибка удаления события: " + (data.message || "неизвестная ошибка"));
-          }
-        })
-        .catch(err => {
-          console.error("Ошибка удаления:", err);
-          alert("Ошибка удаления: " + err.message);
-        });
-      }
-      return;
-    }
-
-    const params = new URLSearchParams({
-      action: "update",
-      id: event.id,
-      title: newTitle,
-      startTime: event.start.toISOString().replace("Z",""),
-      endTime: event.end ? event.end.toISOString().replace("Z","") : ""
-    });
-
-    fetch(GAS_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-  body: JSON.stringify(Object.fromEntries(params))
-    })
-    .then(res => res.json())
-    .then(data => {
-      if (data.status === "updated") {
-        const updatedEv = {
-          id: event.id,
-          title: newTitle,
-          start: event.start.toISOString(),
-          end: event.end ? event.end.toISOString() : null,
-          resourceId: event.resourceId,
-          calendar: event.extendedProps?.calendar || '',
-          color: (event.extendedProps?.calendar === 'master1') ? '#007bff' : '#28a745'
-        };
-        updateEventLocally(updatedEv);
-        loadEvents(true);
-      } else {
-        alert("Ошибка обновления события: " + (data.message || "неизвестная ошибка"));
-      }
-    })
-    .catch(err => {
-      console.error("Ошибка отправки update:", err);
-      alert("Ошибка отправки update: " + err.message);
-    });
-  }
 
   function updateActiveMode(viewName) {
     document.querySelectorAll("#modeSwitcher span").forEach(el => {
@@ -608,8 +541,9 @@ body: JSON.stringify({
     return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
   }
 
-  // Загружаем события сразу при загрузке страницы
-  loadEvents();
+  // Запуск авторизации и загрузки событий при загрузке страницы
+  start();
+
 </script>
 </body>
 </html>
