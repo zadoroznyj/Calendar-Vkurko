@@ -228,11 +228,9 @@
         start: { dateTime: startStr },
         end: { dateTime: endStr },
       };
-      const res = await fetch(`${API_BASE}/events`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        credentials: 'include',
-        body: JSON.stringify(body),
+      const res = await fetch(`${API_BASE}/events?start=${body.start}&end=${body.end}`, {
+      method: 'GET',
+      credentials: 'include',
       });
       if (!res.ok) throw new Error(`Ошибка создания: ${res.status}`);
       const newEvent = await res.json();
