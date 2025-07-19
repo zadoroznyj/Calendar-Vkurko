@@ -1,22 +1,3 @@
-export default {
-	async fetch(request, env, ctx) {
-	  const url = new URL(request.url);
-  
-	  if (url.pathname === "/oauth2callback") {
-		const code = url.searchParams.get("code");
-		return new Response("Authorization code received: " + code);
-	  }
-  
-	  return new Response("Hello from Cloudflare Worker!", {
-		headers: { "content-type": "text/plain" },
-	  });
-	},
-  };
-
-
-
-
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -26,9 +7,6 @@ export default {
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@event-calendar/build@4.5.0/dist/event-calendar.min.css" />
   <script src="https://cdn.jsdelivr.net/npm/@event-calendar/build@4.5.0/dist/event-calendar.min.js"></script>
   <script src="https://hammerjs.github.io/dist/hammer.min.js"></script>
-
-  <!-- Добавляем Google API client -->
-  <script src="https://apis.google.com/js/api.js"></script>
 
   <style>
     body {
@@ -156,9 +134,10 @@ export default {
     <div class="month-footer" id="monthFooter"></div>
     <div class="day-footer" id="dayFooter" style="display: none;"></div>
   </footer>
+
 <script>
-  const CLIENT_ID = '443091544406-r2dimfh1l868rvr1d88kqurogtlhik7f.apps.googleusercontent.com';
-  const SCOPES = 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly';
+  // Твой Cloudflare Worker URL — API сервер
+  const API_BASE = 'https://calendar.leonid-zadoroznyj.workers.dev';
 
   let currentEvents = [];
 
@@ -193,59 +172,25 @@ export default {
     }
   });
 
-  // ============ Google API init ============
+  // ===========================
+  // Получение токена и работа с сервером
+  // ===========================
 
-  function initClient() {
-    return gapi.client.init({
-      clientId: CLIENT_ID,
-      scope: SCOPES,
-      discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest"]
-    });
-  }
-
-  async function signIn() {
-    const authInstance = gapi.auth2.getAuthInstance();
-    if (!authInstance.isSignedIn.get()) {
-      await authInstance.signIn();
-    }
-  }
-
-  async function signOut() {
-    const authInstance = gapi.auth2.getAuthInstance();
-    if (authInstance.isSignedIn.get()) {
-      await authInstance.signOut();
-    }
-  }
-
-  function start() {
-    gapi.load('client:auth2', () => {
-      initClient().then(() => {
-        signIn().then(() => {
-          loadEvents();
-        });
-      });
-    });
-  }
-
-  // ============ Load events from Google Calendar API ============
+  // Вариант: предполагаем, что Worker сам управляет OAuth и токенами.
+  // Фронтенд просто вызывает API с credentials: 'include' (куки или session).
+  // Если нужна авторизация — добавь кнопку для перехода на Worker /oauth2login (по твоей логике).
 
   async function loadEvents() {
-    const calendarId = 'primary';
     const now = new Date();
     const start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
     const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString();
 
     try {
-      const response = await gapi.client.calendar.events.list({
-        calendarId,
-        timeMin: start,
-        timeMax: end,
-        showDeleted: false,
-        singleEvents: true,
-        orderBy: 'startTime',
+      const res = await fetch(`${API_BASE}/events?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`, {
+        credentials: 'include',
       });
-
-      const events = response.result.items || [];
+      if (!res.ok) throw new Error(`Ошибка загрузки: ${res.status}`);
+      const events = await res.json();
 
       currentEvents = events.map(ev => ({
         id: ev.id,
@@ -253,7 +198,7 @@ export default {
         start: ev.start.dateTime || ev.start.date,
         end: ev.end.dateTime || ev.end.date,
         allDay: !!ev.start.date,
-        resourceId: ev.attendees ? 1 : 2, // просто пример, можно по-другому
+        resourceId: ev.attendees ? 1 : 2,
         calendar: 'primary',
         color: '#007bff',
       }));
@@ -266,20 +211,22 @@ export default {
     }
   }
 
-  // ============ Event create / update / delete через Google API ============
-
   async function createEvent(title, startStr, endStr) {
     try {
-      const event = {
+      const body = {
         summary: title,
         start: { dateTime: startStr },
         end: { dateTime: endStr },
       };
-      const response = await gapi.client.calendar.events.insert({
-        calendarId: 'primary',
-        resource: event,
+      const res = await fetch(`${API_BASE}/events`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        credentials: 'include',
+        body: JSON.stringify(body),
       });
-      return response.result;
+      if (!res.ok) throw new Error(`Ошибка создания: ${res.status}`);
+      const newEvent = await res.json();
+      return newEvent;
     } catch (err) {
       alert('Ошибка создания события: ' + err.message);
       throw err;
@@ -288,17 +235,20 @@ export default {
 
   async function updateEvent(id, title, startStr, endStr) {
     try {
-      const event = {
+      const body = {
         summary: title,
         start: { dateTime: startStr },
         end: { dateTime: endStr },
       };
-      const response = await gapi.client.calendar.events.update({
-        calendarId: 'primary',
-        eventId: id,
-        resource: event,
+      const res = await fetch(`${API_BASE}/events/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json'},
+        credentials: 'include',
+        body: JSON.stringify(body),
       });
-      return response.result;
+      if (!res.ok) throw new Error(`Ошибка обновления: ${res.status}`);
+      const updatedEvent = await res.json();
+      return updatedEvent;
     } catch (err) {
       alert('Ошибка обновления события: ' + err.message);
       throw err;
@@ -307,17 +257,18 @@ export default {
 
   async function deleteEvent(id) {
     try {
-      await gapi.client.calendar.events.delete({
-        calendarId: 'primary',
-        eventId: id,
+      const res = await fetch(`${API_BASE}/events/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        credentials: 'include',
       });
+      if (!res.ok) throw new Error(`Ошибка удаления: ${res.status}`);
     } catch (err) {
       alert('Ошибка удаления события: ' + err.message);
       throw err;
     }
   }
 
-  // ============ Локальные обновления в UI ============
+  // Локальное обновление UI
 
   function updateEventLocally(updatedEvent) {
     const index = currentEvents.findIndex(e => e.id === updatedEvent.id);
@@ -334,7 +285,7 @@ export default {
     ec.setOption('events', currentEvents);
   }
 
-  // ============ UI prompts для create / edit ============
+  // UI prompts
 
   async function createEventPrompt(selectInfo) {
     const title = prompt("Введите название нового события:", "");
@@ -391,7 +342,7 @@ export default {
     }
   }
 
-  // ============ Навигация и UI ============
+  // Навигация и UI (как было)
 
   let touchStartX = 0;
   let touchEndX = 0;
@@ -560,9 +511,9 @@ export default {
     return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
   }
 
-  // Запуск авторизации и загрузки событий при загрузке страницы
-  start();
-
+  // Запуск загрузки событий при загрузке страницы
+  loadEvents();
+  updateTitle();
 </script>
 </body>
 </html>
